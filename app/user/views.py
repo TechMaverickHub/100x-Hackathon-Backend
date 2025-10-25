@@ -8,6 +8,7 @@ from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView, ListAPIView
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -16,11 +17,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from app.core.views import CustomPageNumberPagination
 from app.global_constants import SuccessMessage, ErrorMessage, GlobalValues
 from app.user.serializers import UserDisplaySerializer, UserCreateSerializer, UserListFilterDisplaySerializer, \
-    UserUpdateSerializer
+    UserUpdateSerializer, SuperAdminUserCreateSerializer
 from app.utils import get_response_schema
 from permissions import IsSuperAdmin
 
 logger = logging.getLogger('django')
+
 
 class UserCreateThrottle(AnonRateThrottle):
     """Custom throttle for login endpoint"""
@@ -29,7 +31,6 @@ class UserCreateThrottle(AnonRateThrottle):
 
 class SuperAdminSetupView(GenericAPIView):
     """ View: Admin setup """
-    throttle_classes = [UserCreateThrottle]
 
     @swagger_auto_schema(
         request_body=openapi.Schema(
@@ -46,7 +47,7 @@ class SuperAdminSetupView(GenericAPIView):
         with transaction.atomic():
             request.data['role'] = GlobalValues.SUPER_ADMIN.value
 
-            serializer = UserCreateSerializer(data=request.data)
+            serializer = SuperAdminUserCreateSerializer(data=request.data)
             if serializer.is_valid():
                 serializer.save()
 
@@ -62,21 +63,31 @@ class SuperAdminSetupView(GenericAPIView):
 class UserSetupView(GenericAPIView):
     """ View: Admin setup """
     throttle_classes = [UserCreateThrottle]
+    parser_classes = [MultiPartParser, FormParser]
 
     @swagger_auto_schema(
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            properties={
-                'first_name': openapi.Schema(type=openapi.TYPE_STRING, description='First name'),
-                'last_name': openapi.Schema(type=openapi.TYPE_STRING, description='Last name'),
-                'email': openapi.Schema(type=openapi.TYPE_STRING, description='Email'),
-                'password': openapi.Schema(type=openapi.TYPE_STRING, description='Password'),
-            }
-        )
+        manual_parameters=[
+            openapi.Parameter('first_name', openapi.IN_FORM, type=openapi.TYPE_STRING, description='First name',
+                              required=True),
+            openapi.Parameter('last_name', openapi.IN_FORM, type=openapi.TYPE_STRING, description='Last name',
+                              required=True),
+            openapi.Parameter('email', openapi.IN_FORM, type=openapi.TYPE_STRING, description='Email', required=True),
+            openapi.Parameter('password', openapi.IN_FORM, type=openapi.TYPE_STRING, description='Password',
+                              required=True),
+            openapi.Parameter('linkedin_url', openapi.IN_FORM, type=openapi.TYPE_STRING, description='LinkedIn URL',
+                              required=False),
+            openapi.Parameter('github_url', openapi.IN_FORM, type=openapi.TYPE_STRING, description='Github URL',
+                              required=False),
+            openapi.Parameter('resume_file', openapi.IN_FORM, type=openapi.TYPE_FILE, description='Resume file',
+                              required=False),
+        ]
     )
     def post(self, request):
         with transaction.atomic():
             request.data['role'] = GlobalValues.USER.value
+
+            if 'resume_file' in request.FILES:
+                request.data['resume_file'] = request.FILES['resume_file']
 
             serializer = UserCreateSerializer(data=request.data)
             if serializer.is_valid():
@@ -89,6 +100,7 @@ class UserSetupView(GenericAPIView):
                                            status.HTTP_201_CREATED, )
 
             return get_response_schema(serializer.errors, ErrorMessage.BAD_REQUEST.value, status.HTTP_400_BAD_REQUEST)
+
 
 class UserLoginThrottle(AnonRateThrottle):
     """Custom throttle for login endpoint"""
@@ -144,7 +156,7 @@ class UserLogin(GenericAPIView):
             # Successful authentication
             login(request, user)
 
-            #upadte last login
+            # upadte last login
             user.last_login = timezone.now()
             user.save()
 
@@ -200,13 +212,14 @@ class UserLogout(GenericAPIView):
         except:
             return get_response_schema({}, ErrorMessage.BAD_REQUEST.value, status.HTTP_400_BAD_REQUEST)
 
-class UserDetailAPI(GenericAPIView):
 
+class UserDetailAPI(GenericAPIView):
     permission_classes = [IsSuperAdmin]
 
     def get_object(self, pk):
 
-        user_queryset = get_user_model().objects.select_related('role').filter(pk=pk,is_active=True, role_id=GlobalValues.USER.value)
+        user_queryset = get_user_model().objects.select_related('role').filter(pk=pk, is_active=True,
+                                                                               role_id=GlobalValues.USER.value)
         if user_queryset:
             return user_queryset[0]
         return None
@@ -234,7 +247,6 @@ class UserDetailAPI(GenericAPIView):
             SuccessMessage.RECORD_RETRIEVED.value,
             status.HTTP_200_OK
         )
-
 
     def delete(self, request, pk):
 
@@ -351,7 +363,6 @@ class UserListFilterAPI(ListAPIView):
 
         return user_queryset
 
-
     @swagger_auto_schema(
         manual_parameters=[
             openapi.Parameter(
@@ -393,7 +404,7 @@ class ActivateUserAPI(GenericAPIView):
 
     def get_object(self, pk):
 
-        user_queryset = get_user_model().objects.filter(pk=pk,is_active=False, role_id=GlobalValues.USER.value)
+        user_queryset = get_user_model().objects.filter(pk=pk, is_active=False, role_id=GlobalValues.USER.value)
         if user_queryset:
             return user_queryset[0]
         return None
@@ -421,10 +432,3 @@ class ActivateUserAPI(GenericAPIView):
         logger.info(f"Successfully activated user with ID {pk}")
 
         return get_response_schema({}, SuccessMessage.RECORD_UPDATED.value, status.HTTP_200_OK)
-
-
-
-
-
-
-
