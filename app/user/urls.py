@@ -17,4 +17,6 @@ urlpatterns = [
     path('list-filter', UserListFilterAPI.as_view(), name='user-list-filter'),
     path('<int:pk>/activate', ActivateUserAPI.as_view(), name='user-activate'),
 
+
+
 ]

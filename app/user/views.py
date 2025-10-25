@@ -361,6 +361,16 @@ class UserListFilterAPI(ListAPIView):
         if is_active:
             user_queryset = user_queryset.filter(is_active=is_active)
 
+        # Filter by linkedin_url
+        linkedin_url = self.request.query_params.get("linkedin_url", None)
+        if linkedin_url:
+            user_queryset = user_queryset.filter(linkedin_url__istartswith=linkedin_url)
+
+        # Filter by github_url
+        github_url = self.request.query_params.get("github_url", None)
+        if github_url:
+            user_queryset = user_queryset.filter(github_url__istartswith=github_url)
+
         return user_queryset
 
     @swagger_auto_schema(
@@ -389,6 +399,18 @@ class UserListFilterAPI(ListAPIView):
                 description="Filter by user is_active",
                 type=openapi.TYPE_STRING,
                 enum=["True", "False"]
+            ),
+            openapi.Parameter(
+                name="linkedin_url",
+                in_=openapi.IN_QUERY,
+                description="Filter by user linkedin_url",
+                type=openapi.TYPE_STRING
+            ),
+            openapi.Parameter(
+                name="github_url",
+                in_=openapi.IN_QUERY,
+                description="Filter by user github_url",
+                type=openapi.TYPE_STRING
             ),
         ]
     )
