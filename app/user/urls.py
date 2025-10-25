@@ -1,7 +1,7 @@
 from django.urls import path
 
 from app.user.views import SuperAdminSetupView, UserLogin, UserLogout, UserDetailAPI, \
-    UserSetupView, UserListFilterAPI, ActivateUserAPI
+    UserSetupView, UserListFilterAPI, ActivateUserAPI, RegularUserDetailAPI
 
 urlpatterns = [
     # Authentication
@@ -17,6 +17,8 @@ urlpatterns = [
     path('list-filter', UserListFilterAPI.as_view(), name='user-list-filter'),
     path('<int:pk>/activate', ActivateUserAPI.as_view(), name='user-activate'),
 
+    # User views
+    path("me", RegularUserDetailAPI.as_view(), name='user-detail'),
 
 
 ]

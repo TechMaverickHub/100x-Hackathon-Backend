@@ -17,9 +17,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from app.core.views import CustomPageNumberPagination
 from app.global_constants import SuccessMessage, ErrorMessage, GlobalValues
 from app.user.serializers import UserDisplaySerializer, UserCreateSerializer, UserListFilterDisplaySerializer, \
-    UserUpdateSerializer, SuperAdminUserCreateSerializer
+    UserUpdateSerializer, SuperAdminUserCreateSerializer, RegularUserDisplaySerializer, RegularUserUpdateSerializer
 from app.utils import get_response_schema
-from permissions import IsSuperAdmin
+from permissions import IsSuperAdmin, IsUser
 
 logger = logging.getLogger('django')
 
@@ -454,3 +454,64 @@ class ActivateUserAPI(GenericAPIView):
         logger.info(f"Successfully activated user with ID {pk}")
 
         return get_response_schema({}, SuccessMessage.RECORD_UPDATED.value, status.HTTP_200_OK)
+
+
+# User views
+class RegularUserDetailAPI(GenericAPIView):
+    parser_classes = [MultiPartParser, FormParser]
+
+    permission_classes = [IsUser]
+
+    def get(self, request):
+
+        user_queryset = get_user_model().objects.filter(pk=request.user.id, role_id=GlobalValues.USER.value,
+                                                        is_active=True).first()
+        if not user_queryset:
+            logger.error(f"Error retrieving user with ID {request.user.id}", exc_info=True)
+            return get_response_schema(
+                {},
+                ErrorMessage.NOT_FOUND.value,
+                status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = RegularUserDisplaySerializer(user_queryset)
+        return get_response_schema(
+            serializer.data,
+            SuccessMessage.RECORD_RETRIEVED.value,
+            status.HTTP_200_OK
+        )
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter('first_name', openapi.IN_FORM, type=openapi.TYPE_STRING, description='First name'),
+            openapi.Parameter('last_name', openapi.IN_FORM, type=openapi.TYPE_STRING, description='Last name'),
+            openapi.Parameter('linkedin_url', openapi.IN_FORM, type=openapi.TYPE_STRING, description='LinkedIn URL',
+                              required=False),
+            openapi.Parameter('github_url', openapi.IN_FORM, type=openapi.TYPE_STRING, description='Github URL',
+                              required=False),
+            openapi.Parameter('resume_file', openapi.IN_FORM, type=openapi.TYPE_FILE, description='Resume file',
+                              required=False),
+        ]
+    )
+    def patch(self, request):
+
+        user_queryset = get_user_model().objects.filter(pk=request.user.id, role_id=GlobalValues.USER.value,
+                                                        is_active=True).first()
+        if not user_queryset:
+            logger.error(f"Error retrieving user with ID {request.user.id}", exc_info=True)
+            return get_response_schema(
+                {},
+                ErrorMessage.NOT_FOUND.value,
+                status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = RegularUserUpdateSerializer(user_queryset, data=request.data, partial=True)
+
+        if serializer.is_valid():
+            serializer.save()
+            logger.info(f"Successfully updated user with ID {request.user.id}")
+            return get_response_schema(
+                serializer.data,
+                SuccessMessage.RECORD_UPDATED.value,
+                status.HTTP_201_CREATED
+            )
