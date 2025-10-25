@@ -24,6 +24,8 @@ class ErrorMessage(str, Enum):
 
     THROTTLE_LIMIT_EXCEEDED = "Throttle Limit Exceeded"
 
+    RESUME_FILE_MISSING = "Resume file is required."
+
 class GlobalValues(int, Enum):
 
     # User Role
