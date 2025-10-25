@@ -1,10 +1,19 @@
+import json
 import os
+from typing import Dict
 
 from dotenv import load_dotenv
 from groq import Groq
 
 load_dotenv()
 
+# JSON robustness instructions
+JSON_INSTRUCTIONS = """
+Important instructions for JSON robustness:
+- Use double quotes for all keys and string values.
+- Return only the JSON; do not include any extra text or explanations.
+- Follow the example structure provided for each function.
+"""
 
 def generate_latex_prompt(data: dict) -> str:
     """
@@ -75,3 +84,55 @@ Twitter: {data.get('twitter')}
 
     latex_content = choices[0].message.content.strip()
     return latex_content
+
+
+def generate_resume_score(resume_text: str, job_description: str) -> Dict:
+    """
+    Generate a structured JSON score for a resume against a job description using GROQ LLM.
+
+    Returns JSON with keys: score, strengths, weaknesses.
+    Ensures valid JSON with double quotes and no extra text.
+    """
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+    # Prompt with JSON robustness instructions
+    prompt = f"""
+You are a career coach AI. Given the resume and job description below, provide:
+1. A match score (0-100)
+2. Key strengths matched
+3. Key weaknesses or missing experience
+
+Resume:
+{resume_text}
+
+Job Description:
+{job_description}
+
+Return the result as a JSON object with keys:
+"score", "strengths", "weaknesses".
+
+**Important instructions for JSON robustness**:
+- Use double quotes for all keys and strings.
+- Return only the JSON; do not add extra text or explanations.
+- Example structure:
+{{
+    "score": 85,
+    "strengths": ["Python expertise", "Django experience"],
+    "weaknesses": ["Missing Azure Cognitive Services experience"]
+}}
+"""
+
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    content = response.choices[0].message.content.strip()
+
+    try:
+        result_json = json.loads(content)
+    except json.JSONDecodeError:
+        # fallback if JSON parsing fails
+        result_json = {"raw_text": content}
+
+    return result_json

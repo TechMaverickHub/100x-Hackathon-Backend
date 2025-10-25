@@ -1,10 +1,12 @@
+from django.conf import settings
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 
 from app.global_constants import ErrorMessage, SuccessMessage
-from app.resume.resume_utils import generate_latex_prompt
+from app.portfolio.portfolio_utils import get_file_type, extract_resume_text
+from app.resume.resume_utils import generate_latex_prompt, generate_resume_score
 from app.utils import get_response_schema
 from permissions import IsUser
 
@@ -137,3 +139,49 @@ class ResumeGenerateAPIView(GenericAPIView):
         latex_resume = generate_latex_prompt(request.data)
 
         return get_response_schema({"resume": latex_resume}, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+
+class ResumeScoreAPIView(GenericAPIView):
+    permission_classes = [IsUser]
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "job_description": openapi.Schema(type=openapi.TYPE_STRING, description="Job description"),
+            }
+        )
+    )
+    def post(self, request):
+
+        # check if job_Description is none
+        if "job_description" not in request.data:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.BAD_REQUEST.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        if not request.user.resume_file:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.RESUME_FILE_MISSING.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            file_path, file_type = get_file_type(request.user)
+        except ValueError:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.UNSUPPORTED_FILE_TYPE.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        resume_text = extract_resume_text(file_path, file_type)
+
+        result = generate_resume_score(resume_text, request.data.get("job_description"))
+
+        return get_response_schema( result, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+
