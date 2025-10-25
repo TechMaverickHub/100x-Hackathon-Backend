@@ -1,3 +1,4 @@
+import json
 import os
 from html.parser import HTMLParser
 
@@ -145,15 +146,71 @@ def process_resume(file_path: str, file_type: str) -> str:
     return html_content
 
 
-# -------------------------------
-# Example Usage
-# -------------------------------
+def generate_portfolio_from_qna(qna_data: dict) -> str:
+    """
+    Generate a SINGLE-PAGE responsive portfolio HTML via GROQ LLM
+    using structured QnA input.
 
-if __name__ == "__main__":
-    file_path = "resume.pdf"
-    file_type = "pdf"
+    Requirements:
+        - Fully responsive layout
+        - Inline CSS
+        - Suggested color schemes & fonts
+        - SEO meta tags
+        - Browser-compatible HTML
+        - Use ONLY the provided content (no filler text)
+    """
 
-    html_output = process_resume(file_path, file_type)
-    with open("resume_output.html", "w", encoding="utf-8") as f:
-        f.write(html_output)
-    print("HTML résumé generated successfully!")
+    # Convert QnA dict to JSON for clarity in prompt
+    structured_content = json.dumps(qna_data, indent=2)
+
+    prompt = f"""
+You are an expert front-end designer and HTML/CSS generator. 
+Your task is to generate a SINGLE-PAGE responsive personal portfolio website in pure HTML with inline CSS.
+
+INPUT CONTENT:
+{structured_content}
+
+STRUCTURE REQUIRED:
+Sections to include (in this order):
+1. Home (hero intro with name, role, short tagline)
+2. About (brief professional bio + skills)
+3. Resume (download button using provided resume_link)
+4. Projects (interactive cards or grid)
+5. Contact (simple section with email & links)
+
+REQUIREMENTS:
+1. Return ONLY raw HTML code — no markdown, explanations, comments, triple backticks, or "html\\n" prefixes.
+2. The output must start with "<!DOCTYPE html>" and end with "</html>".
+3. All styles must be included in a <style> block inside the <head> (no external CSS or JS files).
+4. Layout must be fully responsive and mobile-friendly.
+5. Apply a clean, minimal design (whitespace, simple color palette, soft shadows, modern typography).
+6. Let the model automatically choose an appropriate font and harmonious color palette.
+7. Include subtle interactive behavior — e.g., smooth scroll, hover effects, mobile menu toggle.
+8. Include a favicon placeholder link in the <head>.
+9. Add <meta> tags for SEO and social preview (title, description, keywords, og:title, og:description, og:type, og:image placeholder).
+10. Ensure semantic HTML and accessibility standards.
+11. Optimize for browser compatibility and responsiveness.
+12. Use "Download Resume" button with the provided resume_link.
+13. Include sample project cards with title, description, and "View Project" button using provided projects.
+14. Use only the input content for all text — no extra filler biography.
+15. Output clean, export-ready HTML starting with <!DOCTYPE html> and ending with </html>.
+"""
+
+    # --- GROQ LLM integration ---
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.6,
+        max_tokens=6000
+    )
+
+    html_content = response.choices[0].message.content.strip()
+
+    # Safety: ensure output starts/ends with proper HTML tags
+    if not html_content.startswith("<!DOCTYPE html>"):
+        html_content = "<!DOCTYPE html>" + html_content.split("<!DOCTYPE html>")[-1]
+    if "</html>" not in html_content:
+        html_content += "</html>"
+
+    return html_content
