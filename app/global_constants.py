@@ -25,6 +25,7 @@ class ErrorMessage(str, Enum):
     THROTTLE_LIMIT_EXCEEDED = "Throttle Limit Exceeded"
 
     RESUME_FILE_MISSING = "Resume file is required."
+    UNSUPPORTED_FILE_TYPE = "Unsupported file type. Only PDF and DOCX allowed."
 
 class GlobalValues(int, Enum):
 
