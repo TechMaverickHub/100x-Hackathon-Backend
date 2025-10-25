@@ -1,11 +1,13 @@
 import json
 import os
-from typing import Dict
+from typing import Dict, Optional
 
 from dotenv import load_dotenv
 from groq import Groq
 
 load_dotenv()
+
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # JSON robustness instructions
 JSON_INSTRUCTIONS = """
@@ -70,7 +72,6 @@ Twitter: {data.get('twitter')}
     if not api_key:
         raise ValueError("GROQ_API_KEY not found in environment variables")
 
-    client = Groq(api_key=api_key)
     response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=[{"role": "user", "content": prompt}],
@@ -93,7 +94,6 @@ def generate_resume_score(resume_text: str, job_description: str) -> Dict:
     Returns JSON with keys: score, strengths, weaknesses.
     Ensures valid JSON with double quotes and no extra text.
     """
-    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     # Prompt with JSON robustness instructions
     prompt = f"""
@@ -136,3 +136,79 @@ Return the result as a JSON object with keys:
         result_json = {"raw_text": content}
 
     return result_json
+
+def keyword_gap_analysis(resume_text: str, job_description: str) -> Dict:
+    """
+    Compare resume against job description and return matched and missing keywords.
+    Returns structured JSON with keys: matched_keywords, missing_keywords.
+    """
+    prompt = f"""
+Extract keywords from the job description that are relevant to the role.
+Compare them to the resume and return two lists: "matched_keywords" and "missing_keywords".
+
+Resume:
+{resume_text}
+
+Job Description:
+{job_description}
+
+**Important instructions for JSON robustness**:
+- Use double quotes for all keys and strings.
+- Return only the JSON; do not add extra text or explanations.
+- Example structure:
+{{
+    "matched_keywords": ["Python", "Django", "REST API"],
+    "missing_keywords": ["Azure Cognitive Services", "Autogen", "Power Automate"]
+}}
+"""
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    content = response.choices[0].message.content.strip()
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"raw_text": content}
+
+
+# 2. Auto-Rewrite / Enhancement Suggestions
+def auto_rewrite_resume(resume_text: str, job_description: str, tone: Optional[str] = "Professional") -> Dict:
+    """
+    Rewrite the resume to improve alignment with the job description.
+    Returns JSON with keys: original_text, enhanced_text, suggested_keywords_added.
+    """
+    prompt = f"""
+Rewrite the resume content to improve alignment with the job description.
+Add missing keywords naturally without changing the meaning.
+Maintain a {tone} tone.
+
+Resume:
+{resume_text}
+
+Job Description:
+{job_description}
+
+**Important instructions for JSON robustness**:
+- Use double quotes for all keys and strings.
+- Return only the JSON; do not add extra text or explanations.
+- Example structure:
+{{
+    "original_text": "Experienced software developer with 3 years in Python and Django.",
+    "enhanced_text": "Experienced software developer with 3 years in Python and Django, skilled in Azure Cognitive Services and Autogen for AI applications.",
+    "suggested_keywords_added": ["Azure Cognitive Services", "Autogen"]
+}}
+"""
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    content = response.choices[0].message.content.strip()
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"raw_text": content}
