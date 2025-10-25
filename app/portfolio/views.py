@@ -8,7 +8,7 @@ from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 
 from app.global_constants import ErrorMessage, SuccessMessage
-from app.portfolio.portfolio_utils import process_resume, generate_portfolio_from_qna
+from app.portfolio.portfolio_utils import process_resume, generate_portfolio_from_qna, get_file_type
 from app.utils import get_response_schema
 
 
@@ -28,23 +28,15 @@ class PortfolioGenerateAPIView(GenericAPIView):
             )
 
 
-        file_path = request.user.resume_file.path if hasattr(request.user.resume_file,
-                                                             'path') else request.user.resume_file
-        _, ext = os.path.splitext(file_path)
-        ext = ext.lower()
 
-        # Determine file type
-        if ext == '.pdf':
-            file_type = 'pdf'
-        elif ext in ['.doc', '.docx']:
-            file_type = 'docx'
-        else:
+        try:
+            file_path, file_type = get_file_type(request.user)
+        except ValueError:
             return get_response_schema(
                 {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.UNSUPPORTED_FILE_TYPE.value]},
                 ErrorMessage.BAD_REQUEST.value,
                 status.HTTP_400_BAD_REQUEST
             )
-
         phtml_output = process_resume(file_path, file_type)
 
         return get_response_schema(

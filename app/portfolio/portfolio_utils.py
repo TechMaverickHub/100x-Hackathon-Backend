@@ -214,3 +214,28 @@ REQUIREMENTS:
         html_content += "</html>"
 
     return html_content
+
+
+def get_file_type(user):
+    """
+    Determines the file type of the user's uploaded resume.
+
+    Args:
+        user: Django user instance with a 'resume_file' attribute.
+
+    Returns:
+        file_type (str): 'pdf' or 'docx'
+
+    Raises:
+        ValueError: If the file type is unsupported.
+    """
+    file_path = user.resume_file.path if hasattr(user.resume_file, 'path') else user.resume_file
+    _, ext = os.path.splitext(file_path)
+    ext = ext.lower()
+
+    if ext == '.pdf':
+        return file_path, 'pdf'
+    elif ext in ['.doc', '.docx']:
+        return file_path, 'docx'
+    else:
+        raise ValueError("Unsupported file type")

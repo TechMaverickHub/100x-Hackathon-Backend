@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'app.role',
     'app.portfolio',
     'app.resume',
+    'app.coverletter',
 ]
 
 MIDDLEWARE = [
