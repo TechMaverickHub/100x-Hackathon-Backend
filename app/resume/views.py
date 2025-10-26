@@ -48,7 +48,6 @@ class ResumeGenerateAPIView(GenericAPIView):
                             type=openapi.TYPE_OBJECT,
                             properties={
                                 "skill": openapi.Schema(type=openapi.TYPE_STRING, description="Soft skill name"),
-                                "weight": openapi.Schema(type=openapi.TYPE_INTEGER, description="Proficiency 1-5")
                             }
                         ),
                         description="List of soft skills with weights"

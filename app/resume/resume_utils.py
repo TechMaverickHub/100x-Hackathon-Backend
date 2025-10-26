@@ -29,7 +29,7 @@ def generate_latex_prompt(data: dict) -> str:
     """
     # --- Build prompt for LLM ---
     technical_skills = ', '.join([f"{s['skill']}({s['weight']})" for s in data.get('skills', {}).get('technical', [])])
-    soft_skills = ', '.join([f"{s['skill']}({s['weight']})" for s in data.get('skills', {}).get('soft', [])])
+    soft_skills = ', '.join([f"{s['skill']}" for s in data.get('skills', {}).get('soft', [])])
 
     projects_text = ''.join([f"- {p['title']}: {p['desc']}\n" for p in data.get('projects', [])])
     experience_text = ''.join(
