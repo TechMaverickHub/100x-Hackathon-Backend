@@ -7,6 +7,8 @@ from rest_framework import status
 from rest_framework.generics import GenericAPIView
 from rest_framework.permissions import IsAuthenticated
 
+from app.analytics.analytics_utils import save_ai_analytics
+from app.analytics.models import AIAnalytics
 from app.global_constants import ErrorMessage, SuccessMessage
 from app.portfolio.portfolio_utils import process_resume, generate_portfolio_from_qna, get_file_type
 from app.utils import get_response_schema
@@ -38,6 +40,10 @@ class PortfolioGenerateAPIView(GenericAPIView):
                 status.HTTP_400_BAD_REQUEST
             )
         phtml_output = process_resume(file_path, file_type)
+
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.PORTFOLIO_FROM_RESUME, phtml_output)
+
 
         return get_response_schema(
             {"html": phtml_output},
@@ -171,6 +177,9 @@ class PortfolioGenerateFromQNAAPIView(GenericAPIView):
             return get_response_schema({}, ErrorMessage.BAD_REQUEST.value, status.HTTP_400_BAD_REQUEST)
         # Pass QnA dict to your generator function
         html_output = generate_portfolio_from_qna(request.data)
+
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.PORTFOLIO_FROM_QNA, html_output)
 
         return get_response_schema(
             {"html": html_output},

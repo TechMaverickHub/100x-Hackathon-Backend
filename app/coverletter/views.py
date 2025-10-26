@@ -5,6 +5,8 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 
+from app.analytics.analytics_utils import save_ai_analytics
+from app.analytics.models import AIAnalytics
 from app.coverletter.coverletter_utils import generate_cover_letter
 from app.global_constants import ErrorMessage, SuccessMessage
 from app.portfolio.portfolio_utils import get_file_type, extract_resume_text
@@ -47,6 +49,9 @@ class CoverletterAPIView(GenericAPIView):
         resume_text = extract_resume_text(file_path, file_type)
 
         cover_letter = generate_cover_letter(resume_text, job_description, tone)
+
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.COVER_LETTER, cover_letter)
 
         return get_response_schema(
             {"cover_letter": cover_letter},

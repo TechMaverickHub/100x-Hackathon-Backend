@@ -5,6 +5,8 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 
+from app.analytics.analytics_utils import save_ai_analytics
+from app.analytics.models import AIAnalytics
 from app.global_constants import ErrorMessage, SuccessMessage
 from app.interview.interview_utils import generate_interview_questions, generate_interview_score
 from app.portfolio.portfolio_utils import get_file_type, extract_resume_text
@@ -51,6 +53,9 @@ class GenerateQuestionsAPIView(GenericAPIView):
         resume_text = extract_resume_text(file_path, file_type)
 
         question_list = generate_interview_questions(resume_text, job_description, question_type)
+
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.INTERVIEW_QUESTIONS, question_list)
 
         return get_response_schema(
             {"questions": question_list},
@@ -110,6 +115,9 @@ class AnswerQuestionsAPIView(GenericAPIView):
         resume_text = extract_resume_text(file_path, file_type)
 
         interview_score = generate_interview_score(resume_text, job_description, question_list)
+
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.INTERVIEW_ANSWERS, interview_score)
 
         return get_response_schema(
             {"interview_score": interview_score},

@@ -4,6 +4,8 @@ from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 
+from app.analytics.analytics_utils import save_ai_analytics
+from app.analytics.models import AIAnalytics
 from app.global_constants import ErrorMessage, SuccessMessage
 from app.portfolio.portfolio_utils import get_file_type, extract_resume_text
 from app.resume.resume_utils import generate_latex_prompt, generate_resume_score, keyword_gap_analysis, \
@@ -138,6 +140,9 @@ class ResumeGenerateAPIView(GenericAPIView):
 
         latex_resume = generate_latex_prompt(request.data)
 
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.RESUME, latex_resume)
+
         return get_response_schema({"resume": latex_resume}, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
 
@@ -181,6 +186,9 @@ class ResumeScoreAPIView(GenericAPIView):
         resume_text = extract_resume_text(file_path, file_type)
 
         result = generate_resume_score(resume_text, request.data.get("job_description"))
+
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.RESUME_SCORE, result)
 
         return get_response_schema( result, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
@@ -226,6 +234,9 @@ class ResumeKeywordGapAPIView(GenericAPIView):
 
         result = keyword_gap_analysis(resume_text, request.data.get("job_description"))
 
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.RESUME_KEYWORD_GAP, result)
+
         return get_response_schema( result, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
 
@@ -269,6 +280,9 @@ class ResumeAutoRewriteAPIView(GenericAPIView):
         resume_text = extract_resume_text(file_path, file_type)
 
         result = auto_rewrite_resume(resume_text, request.data.get("job_description"), request.data.get("tone", "Professional"))
+
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.RESUME_AUTO_REWRITE, result)
 
         return get_response_schema( result, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
@@ -314,6 +328,9 @@ class ResumeSkillsGapAPIView(GenericAPIView):
 
         result = generate_skill_gap(resume_text, request.data.get("job_description"))
 
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.RESUME_SKILLS_GAP, result)
+
         return get_response_schema(result, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
 
@@ -358,6 +375,9 @@ class ResumeCareerRecommendationAPIView(GenericAPIView):
         resume_text = extract_resume_text(file_path, file_type)
 
         result = generate_career_recommendation(resume_text, request.data.get("job_description"))
+
+        # save to ai analytics
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.RESUME_CAREER_RECOMMENDATION, result)
 
         return get_response_schema(result, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
