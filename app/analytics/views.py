@@ -5,10 +5,11 @@ from django.utils.timesince import timesince
 from rest_framework import status
 from rest_framework.generics import GenericAPIView
 
+from app.analytics.models import AIAnalytics
 from app.global_constants import RoleConstants, SuccessMessage
 from app.job_source.models import Source, UserSource
 from app.utils import get_response_schema
-from permissions import IsSuperAdmin
+from permissions import IsSuperAdmin, IsUser
 
 
 # Create your views here.
@@ -76,6 +77,20 @@ class SourcePopularityAPIView(GenericAPIView):
         counts = [item["user_count"] for item in source_stats]
 
         return_data = {"sources": sources, "counts": counts}
+
+        return get_response_schema(return_data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+
+class CreditRemainingAPIView(GenericAPIView):
+    permission_classes = [IsUser]
+
+    def get(self, request):
+
+        credits_used = AIAnalytics.objects.filter(user_id = request.user.id).count()
+
+        credits_remaining = 100 - credits_used
+
+        return_data = {"credits_remaining": credits_remaining}
 
         return get_response_schema(return_data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
