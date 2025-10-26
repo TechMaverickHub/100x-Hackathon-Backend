@@ -44,6 +44,8 @@ urlpatterns = [
     path('api/portfolio/', include('app.portfolio.urls')),
     path('api/resume/', include('app.resume.urls')),
     path('api/cover-letter/', include('app.coverletter.urls')),
+    path('api/interview/', include('app.interview.urls')),
+
 
     # Documentation
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
