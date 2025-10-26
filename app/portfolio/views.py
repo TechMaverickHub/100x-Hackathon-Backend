@@ -50,79 +50,127 @@ class PortfolioGenerateFromQNAAPIView(GenericAPIView):
 
     permission_classes = [IsAuthenticated]
 
-    # Define the OpenAPI request body schema directly
-    @swagger_auto_schema(
-        operation_description="Generate single-page portfolio HTML from guided Q&A user input",
-        request_body=openapi.Schema(
-            type=openapi.TYPE_OBJECT,
-            required=["name", "role", "bio", "email"],
-            properties={
-                # Home
-                "name": openapi.Schema(type=openapi.TYPE_STRING, description="What's your full name?"),
-                "role": openapi.Schema(type=openapi.TYPE_STRING, description="What's your professional title or main expertise?"),
-                "tagline": openapi.Schema(type=openapi.TYPE_STRING, description="Short personal tagline or mission statement."),
+    resume_request_schema = openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=["name", "role", "bio", "email"],
+        properties={
+            # Home
+            "name": openapi.Schema(type=openapi.TYPE_STRING, description="Full name"),
+            "role": openapi.Schema(type=openapi.TYPE_STRING, description="Professional title / main expertise"),
+            "tagline": openapi.Schema(type=openapi.TYPE_STRING,
+                                      description="Short personal tagline or mission statement"),
 
-                # About
-                "bio": openapi.Schema(type=openapi.TYPE_STRING, description="Write a 2–3 sentence summary about yourself (for the About section)."),
-                "skills": openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    items=openapi.Items(type=openapi.TYPE_STRING),
-                    description="List of top technical and soft skills (e.g., ['Python','Django','GenAI'])."
-                ),
-
-                # Projects
-                "projects": openapi.Schema(
-                    type=openapi.TYPE_ARRAY,
-                    description="List of 2–4 key projects. Each should include title, desc, and link.",
-                    items=openapi.Items(
-                        type=openapi.TYPE_OBJECT,
-                        properties={
-                            "title": openapi.Schema(type=openapi.TYPE_STRING, description="Project title (e.g., 'CreatorPulse')"),
-                            "desc": openapi.Schema(type=openapi.TYPE_STRING, description="Short project description (1–2 sentences)"),
-                            "link": openapi.Schema(type=openapi.TYPE_STRING, description="Project URL or repo link", nullable=True),
-                        }
+            # About
+            "bio": openapi.Schema(type=openapi.TYPE_STRING, description="2–3 sentence summary about yourself"),
+            "skills": openapi.Schema(
+                type=openapi.TYPE_OBJECT,
+                properties={
+                    "technical": openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Items(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "skill": openapi.Schema(type=openapi.TYPE_STRING, description="Technical skill name"),
+                                "weight": openapi.Schema(type=openapi.TYPE_INTEGER, description="Proficiency 1-5")
+                            }
+                        ),
+                        description="List of technical skills with weights"
                     ),
-                ),
+                    "soft": openapi.Schema(
+                        type=openapi.TYPE_ARRAY,
+                        items=openapi.Items(
+                            type=openapi.TYPE_OBJECT,
+                            properties={
+                                "skill": openapi.Schema(type=openapi.TYPE_STRING, description="Soft skill name"),
+                            }
+                        ),
+                        description="List of soft skills with weights"
+                    )
+                }
+            ),
 
-                # Contact
-                "email": openapi.Schema(type=openapi.TYPE_STRING, description="Your public contact email."),
-                "linkedin": openapi.Schema(type=openapi.TYPE_STRING, description="LinkedIn profile link.", nullable=True),
-                "github": openapi.Schema(type=openapi.TYPE_STRING, description="GitHub profile link.", nullable=True),
-                "twitter": openapi.Schema(type=openapi.TYPE_STRING, description="Twitter/X profile link (optional).", nullable=True),
-            },
-            example={
-                "name": "Abhiroop Bhattacharyya",
-                "role": "Software Developer",
-                "tagline": "Building intelligent systems that scale humans.",
-                "bio": "Data-driven engineer specializing in Django and GenAI applications.",
-                "skills": ["Python", "Django", "React", "Generative AI"],
-                "projects": [
-                    {
-                        "title": "CreatorPulse",
-                        "desc": "AI newsletter automation platform with Django + React.",
-                        "link": "https://github.com/TechMaverickHub/100x-LLM-Assignment-CreatorPulse-frontend"
+            # Projects
+            "projects": openapi.Schema(
+                type=openapi.TYPE_ARRAY,
+                description="List of projects with title, description, and link",
+                items=openapi.Items(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "title": openapi.Schema(type=openapi.TYPE_STRING, description="Project title"),
+                        "desc": openapi.Schema(type=openapi.TYPE_STRING, description="Short description"),
+                        "link": openapi.Schema(type=openapi.TYPE_STRING, description="Project URL or repo link",
+                                               nullable=True)
                     }
-                ],
-                "email": "abhiroop@example.com",
-                "linkedin": "https://linkedin.com/in/abhiroop",
-                "github": "https://github.com/TechMaverickHub"
-            }
-        ),
-        responses={200: "Generated HTML in response['html']", 400: "Bad Request"},
+                )
+            ),
+
+            # Experience
+            "experience": openapi.Schema(
+                type=openapi.TYPE_ARRAY,
+                description="List of work experience",
+                items=openapi.Items(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "role": openapi.Schema(type=openapi.TYPE_STRING, description="Job title"),
+                        "company": openapi.Schema(type=openapi.TYPE_STRING, description="Company name"),
+                        "duration": openapi.Schema(type=openapi.TYPE_STRING, description="Start-End dates"),
+                        "desc": openapi.Schema(type=openapi.TYPE_STRING, description="Responsibilities / achievements")
+                    }
+                )
+            ),
+
+            # Education
+            "education": openapi.Schema(
+                type=openapi.TYPE_ARRAY,
+                description="List of education entries",
+                items=openapi.Items(
+                    type=openapi.TYPE_OBJECT,
+                    properties={
+                        "degree": openapi.Schema(type=openapi.TYPE_STRING, description="Degree name"),
+                        "institution": openapi.Schema(type=openapi.TYPE_STRING, description="Institution name"),
+                        "year": openapi.Schema(type=openapi.TYPE_STRING, description="Graduation year")
+                    }
+                )
+            ),
+
+            # Contact
+            "email": openapi.Schema(type=openapi.TYPE_STRING, description="Public contact email"),
+            "linkedin": openapi.Schema(type=openapi.TYPE_STRING, description="LinkedIn profile link", nullable=True),
+            "github": openapi.Schema(type=openapi.TYPE_STRING, description="GitHub profile link", nullable=True),
+            "twitter": openapi.Schema(type=openapi.TYPE_STRING, description="Twitter/X profile link", nullable=True)
+        },
+        example={
+            "name": "Abhiroop Bhattacharyya",
+            "role": "Software Developer / AI Engineer",
+            "tagline": "Building intelligent systems that scale humans.",
+            "bio": "Data-driven engineer specializing in Django and GenAI applications.",
+            "skills": {
+                "technical": [{"skill": "Python", "weight": 5}, {"skill": "Django", "weight": 5}],
+                "soft": [{"skill": "Teamwork"}, {"skill": "Leadership"}]
+            },
+            "projects": [{"title": "CreatorPulse", "desc": "AI newsletter automation platform",
+                          "link": "https://github.com/..."}],
+            "experience": [{"role": "Software Engineer", "company": "TechCorp", "duration": "2023-2025",
+                            "desc": "Built scalable APIs"}],
+            "education": [{"degree": "M.Tech CS", "institution": "IIT XYZ", "year": "2023"}],
+            "email": "abhiroop@example.com",
+            "linkedin": "https://linkedin.com/in/abhiroop",
+            "github": "https://github.com/TechMaverickHub",
+            "twitter": "https://x.com/abhiroop"
+        }
+    )
+
+    @swagger_auto_schema(
+        operation_description="Generate ATS-friendly LaTeX resume from user input",
+        request_body=resume_request_schema,
+        responses={200: "Returns LLM prompt for LaTeX resume", 400: "Bad Request"}
     )
     def post(self, request):
-        qna_data = request.data
-
-        # Basic validation (you can extend this)
-        if not qna_data.get("name") or not qna_data.get("role"):
-            return get_response_schema(
-                {"error": "Missing required fields (name, role)."},
-                ErrorMessage.BAD_REQUEST.value,
-                status.HTTP_400_BAD_REQUEST,
-            )
-
+        # check if "name", "role", "bio", "email" in request data
+        if "name" not in request.data or "role" not in request.data or "bio" not in request.data or "email" not in request.data:
+            return get_response_schema({}, ErrorMessage.BAD_REQUEST.value, status.HTTP_400_BAD_REQUEST)
         # Pass QnA dict to your generator function
-        html_output = generate_portfolio_from_qna(qna_data)
+        html_output = generate_portfolio_from_qna(request.data)
 
         return get_response_schema(
             {"html": html_output},
