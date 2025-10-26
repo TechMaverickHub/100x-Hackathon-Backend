@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'app.coverletter',
     'app.interview',
     'app.job_source',
+    'app.analytics',
 ]
 
 MIDDLEWARE = [

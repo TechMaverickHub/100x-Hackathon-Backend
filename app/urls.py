@@ -46,6 +46,7 @@ urlpatterns = [
     path('api/cover-letter/', include('app.coverletter.urls')),
     path('api/interview/', include('app.interview.urls')),
     path('api/job-source/', include('app.job_source.urls')),
+    path('api/analytics/', include('app.analytics.urls')),
 
 
     # Documentation
