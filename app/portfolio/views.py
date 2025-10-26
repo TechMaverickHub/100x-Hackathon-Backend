@@ -70,9 +70,6 @@ class PortfolioGenerateFromQNAAPIView(GenericAPIView):
                     description="List of top technical and soft skills (e.g., ['Python','Django','GenAI'])."
                 ),
 
-                # Resume
-                "resume_link": openapi.Schema(type=openapi.TYPE_STRING, description="Provide a link/path for your downloadable resume."),
-
                 # Projects
                 "projects": openapi.Schema(
                     type=openapi.TYPE_ARRAY,
@@ -99,7 +96,6 @@ class PortfolioGenerateFromQNAAPIView(GenericAPIView):
                 "tagline": "Building intelligent systems that scale humans.",
                 "bio": "Data-driven engineer specializing in Django and GenAI applications.",
                 "skills": ["Python", "Django", "React", "Generative AI"],
-                "resume_link": "/media/resumes/abhiroop_resume.pdf",
                 "projects": [
                     {
                         "title": "CreatorPulse",

@@ -84,12 +84,15 @@ class UserSetupView(GenericAPIView):
     )
     def post(self, request):
         with transaction.atomic():
-            request.data['role'] = GlobalValues.USER.value
+
+            data = request.data.copy()  # make mutable copy
+            data['role'] = GlobalValues.USER.value
+
 
             if 'resume_file' in request.FILES:
-                request.data['resume_file'] = request.FILES['resume_file']
+                data['resume_file'] = request.FILES['resume_file']
 
-            serializer = UserCreateSerializer(data=request.data)
+            serializer = UserCreateSerializer(data=data)
             if serializer.is_valid():
                 serializer.save()
 
