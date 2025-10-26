@@ -142,6 +142,23 @@ Interactive Swagger docs available at:
 
 ---
 
+## Frontend 
+
+The frontend of **PortfolioAI** is built with **React** and connects to the Django REST API backend.  
+
+You can access the repository here:  
+[PortfolioAI React Frontend](https://github.com/TechMaverickHub/100x-Hackathon-Frontend)
+
+### Quick Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/TechMaverickHub/100x-Hackathon-Frontend.git
+cd 100x-Hackathon-Frontend
+
+yarn install
+yarn run
+
 ---
 
 **PortfolioAI** streamlines job readiness for engineers, turning hours of work into minutes.
