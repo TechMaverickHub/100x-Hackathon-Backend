@@ -97,8 +97,6 @@ def generate_latex_prompt(data: dict) -> str:
     # --- Structured Text Assembly ---
     tech_skills = ', '.join([f"{s['skill']} ({s['weight']})" for s in data.get('skills', {}).get('technical', [])])
     soft_skills = ', '.join([s['skill'] for s in data.get('skills', {}).get('soft', [])])
-
-    # Safe handling of soft skills line for LaTeX
     soft_skills_line = f"\\\\{soft_skills}" if soft_skills else ""
 
     projects_text = "".join([
@@ -122,15 +120,20 @@ def generate_latex_prompt(data: dict) -> str:
         for ed in data.get('education', [])
     ])
 
-    contact_links = ""
-    if data.get('links'):
-        contact_links = " | ".join([f"\\href{{{v}}}{{{k}}}" for k, v in data.get('links', {}).items()])
+    # --- Build contact links ---
+    contact_links_list = []
+    if data.get('email'):
+        contact_links_list.append(f"\\href{{mailto:{data['email']}}}{{Email}}")
+    if data.get('links', {}).get('LinkedIn'):
+        contact_links_list.append(f"\\href{{{data['links']['LinkedIn']}}}{{LinkedIn}}")
+    if data.get('links', {}).get('GitHub'):
+        contact_links_list.append(f"\\href{{{data['links']['GitHub']}}}{{GitHub}}")
+    if data.get('links', {}).get('Twitter'):
+        contact_links_list.append(f"\\href{{{data['links']['Twitter']}}}{{Twitter}}")
 
-    certifications_text = ""
-    if data.get('certifications'):
-        certifications_text = "\\section*{Certifications}\n" + "\\\\\n".join(data['certifications'])
+    contact_links = " | ".join(contact_links_list)
 
-    # --- Adaptive Prompt ---
+    # --- Adaptive One-Page Prompt ---
     prompt = f"""
 Generate ONLY the LaTeX code for a one-page, ATS-friendly resume.
 Do NOT include any explanation or text outside LaTeX code.
@@ -151,7 +154,7 @@ Do NOT include any explanation or text outside LaTeX code.
 \\begin{{center}}
     {{\\LARGE \\textbf{{{data.get('name')}}}}} \\\\[0.15cm]
     {data.get('role')} | {data.get('tagline', '')} \\\\[0.15cm]
-    {data.get('location', '')} | {data.get('phone', '')} | \\href{{mailto:{data.get('email')}}}{{{data.get('email')}}} \\\\
+    {data.get('location', '')} | {data.get('phone', '')} \\\\
     {contact_links}
 \\end{{center}}
 
@@ -160,7 +163,7 @@ Do NOT include any explanation or text outside LaTeX code.
 \\section*{{Summary}}
 {data.get('bio', '')}
 
-\\section*{{Technical Skills}}
+\\section*{{Skills}}
 {tech_skills}
 {soft_skills_line}
 
@@ -173,17 +176,15 @@ Do NOT include any explanation or text outside LaTeX code.
 \\section*{{Education}}
 {education_text}
 
-{certifications_text}
-
 \\end{{document}}
 
-Guidelines for the LLM:
-- Must fit exactly one page.
-- Dynamically reduce font size, line spacing, or margins if content overflows.
-- Summarize longer bullet points but never hallucinate new information.
-- Expand/rephrase if content is too short to fill the page.
-- Strictly preserve LaTeX syntax and styling.
-- Section order: Summary → Technical Skills → Projects → Experience → Education → Certifications (if any).
+Instructions for LLM to ensure strict one-page output:
+1. All sections must appear in this order: Summary →  Skills → Projects → Experience → Education.
+2. If the content is too short to fill one page, slightly expand/rephrase **existing content only**, adding context or measurable details, but do NOT invent new content.
+3. If the content is too long, summarize bullets starting from lowest-priority sections: Education →  Skills → Projects → Experience → Summary. Condense bullets into single lines, preserving meaning.
+4. Bullets in Projects and Experience should never be split across pages.
+5. Do not adjust margins, font size, or line spacing — maintain defaults.
+6. The final LaTeX output must strictly fit **exactly one page** and remain ATS-friendly.
 """
 
     # --- GROQ API Call ---
