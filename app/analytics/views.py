@@ -2,10 +2,15 @@ from django.contrib.auth import get_user_model
 from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.utils.timesince import timesince
+from drf_yasg import openapi
+from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
-from rest_framework.generics import GenericAPIView
+from rest_framework.generics import GenericAPIView, ListAPIView
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from app.analytics.models import AIAnalytics
+from app.analytics.serializers import AIAnalyticsListFilterDisplaySerializer
+from app.core.views import CustomPageNumberPagination
 from app.global_constants import RoleConstants, SuccessMessage
 from app.job_source.models import Source, UserSource
 from app.utils import get_response_schema
@@ -93,6 +98,35 @@ class CreditRemainingAPIView(GenericAPIView):
         return_data = {"credits_remaining": credits_remaining}
 
         return get_response_schema(return_data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+
+class APICallListFilter(ListAPIView):
+    serializer_class = AIAnalyticsListFilterDisplaySerializer
+    pagination_class = CustomPageNumberPagination
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsUser]
+
+    def get_queryset(self):
+
+        ai_analytics_queryset = AIAnalytics.objects.filter(is_active=True, user_id=self.request.user.id).order_by("-created")
+
+        # Filter by generation_type
+        generation_type = self.request.query_params.get("generation_type", None)
+        if generation_type:
+            ai_analytics_queryset = ai_analytics_queryset.filter(generation_type=generation_type)
+
+        return ai_analytics_queryset
+
+    @swagger_auto_schema(
+        manual_parameters=[
+            openapi.Parameter("generation_type", openapi.IN_QUERY, description="Filter by name", type=openapi.TYPE_STRING, enum=[choice.value for choice in AIAnalytics.GenerationType])
+
+        ]
+    )
+    def get(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
+
 
 
 
