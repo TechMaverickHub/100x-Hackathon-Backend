@@ -88,68 +88,102 @@ Important instructions for JSON robustness:
 
 def generate_latex_prompt(data: dict) -> str:
     """
-    Generates an ATS-optimized, exactly one-page LaTeX resume using AutoCV template.
-    Automatically expands or summarizes content to fit the page precisely.
-    Section order: Summary → Technical Skills → Projects → Experience → Education
+    Generates an ATS-optimized, exactly one-page LaTeX resume.
+    Section order: Summary → Technical Skills → Projects → Experience → Education → Certifications (if any)
+    Automatically expands or summarizes content to fit one page.
+    Compatible with Python 3.11+.
     """
 
     # --- Structured Text Assembly ---
     tech_skills = ', '.join([f"{s['skill']} ({s['weight']})" for s in data.get('skills', {}).get('technical', [])])
     soft_skills = ', '.join([s['skill'] for s in data.get('skills', {}).get('soft', [])])
 
-    projects_text = '\n'.join([f"- {p['title']}: {p['desc']}" for p in data.get('projects', [])])
-    experience_text = '\n'.join([f"- {e['role']} at {e['company']} ({e['duration']}): {e['desc']}"
-                                 for e in data.get('experience', [])])
-    education_text = '\n'.join([f"- {ed['degree']} from {ed['institution']} ({ed['year']})"
-                                 for ed in data.get('education', [])])
+    # Safe handling of soft skills line for LaTeX
+    soft_skills_line = f"\\\\{soft_skills}" if soft_skills else ""
+
+    projects_text = "".join([
+        f"\\noindent\\textbf{{{p['title']}}} \\\\ \n\\begin{{itemize}}\n" +
+        "".join([f"    \\item {line}\n" for line in p.get('desc_lines', [p['desc']])]) +
+        "\\end{itemize}\n"
+        for p in data.get('projects', [])
+    ])
+
+    experience_text = "".join([
+        f"\\noindent\\textbf{{{e['role']} at {e['company']}}} \\hfill {e['duration']} \\\\\n" +
+        (f"\\textit{{{e.get('location', '')}}} \\\\\n" if e.get('location') else "") +
+        "\\begin{itemize}\n" +
+        "".join([f"    \\item {line}\n" for line in e.get('desc_lines', [e['desc']])]) +
+        "\\end{itemize}\n"
+        for e in data.get('experience', [])
+    ])
+
+    education_text = "".join([
+        f"\\noindent \\textbf{{{ed['degree']} from {ed['institution']}}} \\hfill {ed['year']} \n"
+        for ed in data.get('education', [])
+    ])
+
+    contact_links = ""
+    if data.get('links'):
+        contact_links = " | ".join([f"\\href{{{v}}}{{{k}}}" for k, v in data.get('links', {}).items()])
+
+    certifications_text = ""
+    if data.get('certifications'):
+        certifications_text = "\\section*{Certifications}\n" + "\\\\\n".join(data['certifications'])
 
     # --- Adaptive Prompt ---
     prompt = f"""
-Generate ONLY the LaTeX code for a **one-page**, ATS-friendly resume using the AutoCV template.
-Do NOT include any explanation, comments, or text outside the LaTeX code.
+Generate ONLY the LaTeX code for a one-page, ATS-friendly resume.
+Do NOT include any explanation or text outside LaTeX code.
 
-Strict Requirements:
-- The final output must fit **exactly one page** — not less, not more.
-- Use AutoCV template commands for structure (sections, spacing, font).
-- Adjust font size, line spacing, and margins automatically if needed.
-- If content is too short → rephrase or elaborate existing lines to fill space.
-- If content is too long → summarize or compress longer bullet points.
-- Never invent new information.
-- Maintain a professional, neutral, readable tone.
-- Ensure all text is plain-text parsable (ATS-safe: no icons, symbols, or color).
+\\documentclass[10pt,a4paper]{{article}}
+\\usepackage{{geometry}}
+\\geometry{{a4paper, margin=0.5in}}
+\\usepackage{{enumitem}}
+\\usepackage{{hyperref}}
+\\linespread{{0.95}}
+\\setlength{{\\parskip}}{{0pt}}
+\\setlist[itemize]{{noitemsep, topsep=0pt, left=0.15in}}
+\\pagenumbering{{gobble}}
+\\renewcommand{{\\labelitemi}}{{--}}
 
-Section Order:
-1. Summary (expanded version of Bio)
-2. Technical Skills
-3. Projects
-4. Experience
-5. Education
+\\begin{{document}}
 
-Resume Data:
-Name: {data.get('name')}
-Role: {data.get('role')}
-Tagline: {data.get('tagline')}
-Bio (for Summary): {data.get('bio')}
+\\begin{{center}}
+    {{\\LARGE \\textbf{{{data.get('name')}}}}} \\\\[0.15cm]
+    {data.get('role')} | {data.get('tagline', '')} \\\\[0.15cm]
+    {data.get('location', '')} | {data.get('phone', '')} | \\href{{mailto:{data.get('email')}}}{{{data.get('email')}}} \\\\
+    {contact_links}
+\\end{{center}}
 
-Technical Skills:
+\\vspace{{0.2cm}}
+
+\\section*{{Summary}}
+{data.get('bio', '')}
+
+\\section*{{Technical Skills}}
 {tech_skills}
-Soft Skills:
-{soft_skills}
+{soft_skills_line}
 
-Projects:
+\\section*{{Projects}}
 {projects_text}
 
-Experience:
+\\section*{{Experience}}
 {experience_text}
 
-Education:
+\\section*{{Education}}
 {education_text}
 
-Contact:
-Email: {data.get('email')}
-LinkedIn: {data.get('linkedin')}
-GitHub: {data.get('github')}
-Twitter: {data.get('twitter')}
+{certifications_text}
+
+\\end{{document}}
+
+Guidelines for the LLM:
+- Must fit exactly one page.
+- Dynamically reduce font size, line spacing, or margins if content overflows.
+- Summarize longer bullet points but never hallucinate new information.
+- Expand/rephrase if content is too short to fill the page.
+- Strictly preserve LaTeX syntax and styling.
+- Section order: Summary → Technical Skills → Projects → Experience → Education → Certifications (if any).
 """
 
     # --- GROQ API Call ---
@@ -170,7 +204,6 @@ Twitter: {data.get('twitter')}
 
     latex_content = choices[0].message.content.strip()
     return latex_content
-
 
 def generate_resume_score(resume_text: str, job_description: str) -> Dict:
     """
