@@ -39,8 +39,9 @@ class UserSourceSelectSerializer(serializers.ModelSerializer):
 
 
 class UserSourceSelectDisplaySerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField(source='source.id', read_only=True)
+    name = serializers.CharField(source='source.name', read_only=True)
 
-    source = SourceDisplaySerializer()
     class Meta:
         model = UserSource
-        fields = ('pk', 'source', 'frequency', 'alert')
+        fields = ('id', 'name')

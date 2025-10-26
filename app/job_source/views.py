@@ -14,7 +14,7 @@ from app.job_source.serializers import SourceCreateSerializer, SourceDisplaySeri
     SourceListFilterDisplaySerializer, SourceListSerializer, UserSourceSelectSerializer, \
     UserSourceSelectDisplaySerializer
 from app.utils import get_response_schema
-from permissions import IsSuperAdmin
+from permissions import IsSuperAdmin, IsUser
 
 
 # Create your views here.
@@ -149,7 +149,7 @@ class SourceListFilter(ListAPIView):
 
 class SourceListAPIView(GenericAPIView):
     """Source: List"""
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [IsUser]
 
 
     def get(self, request):
@@ -160,7 +160,7 @@ class SourceListAPIView(GenericAPIView):
 
 class SourceSelectAPIView(GenericAPIView):
     """Source: Select"""
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [IsUser]
 
     source_item_schema = openapi.Schema(
         type=openapi.TYPE_OBJECT,
@@ -201,17 +201,17 @@ class SourceSelectAPIView(GenericAPIView):
 
 class UserSourceSelectAPIView(GenericAPIView):
     """User Source: Select"""
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [IsUser]
 
     def get(self, request):
-        user_source_queryset = UserSource.objects.select_related("source").filter(is_active=True, user_id=request.user.id).order_by("-updated")
+        user_source_queryset = request.user.job_sources.filter(is_active=True).order_by("-updated")
         serializer = UserSourceSelectDisplaySerializer(user_source_queryset, many=True)
         return get_response_schema(serializer.data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
 
 class UserSourceUpdateAPIView(GenericAPIView):
     """User Source: Update"""
-    permission_classes = [IsSuperAdmin]
+    permission_classes = [IsUser]
 
     source_item_schema = openapi.Schema(
         type=openapi.TYPE_OBJECT,
