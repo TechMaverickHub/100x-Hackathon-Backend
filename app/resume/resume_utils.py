@@ -17,39 +17,124 @@ Important instructions for JSON robustness:
 - Follow the example structure provided for each function.
 """
 
+# def generate_latex_prompt(data: dict) -> str:
+#     """
+#     Generates an ATS-friendly LaTeX resume from user input JSON via GROQ LLM.
+#
+#     Args:
+#         data (dict): Resume input including name, role, tagline, bio, skills, projects, experience, education, contact.
+#
+#     Returns:
+#         str: Raw LaTeX code of the resume.
+#     """
+#     # --- Build prompt for LLM ---
+#     technical_skills = ', '.join([f"{s['skill']}({s['weight']})" for s in data.get('skills', {}).get('technical', [])])
+#     soft_skills = ', '.join([f"{s['skill']}" for s in data.get('skills', {}).get('soft', [])])
+#
+#     projects_text = ''.join([f"- {p['title']}: {p['desc']}\n" for p in data.get('projects', [])])
+#     experience_text = ''.join(
+#         [f"- {e['role']} at {e['company']} ({e['duration']}): {e['desc']}\n" for e in data.get('experience', [])])
+#     education_text = ''.join(
+#         [f"- {ed['degree']} from {ed['institution']} ({ed['year']})\n" for ed in data.get('education', [])])
+#
+#     prompt = f"""
+# Generate only the LaTeX code for a classic, one-column, fully monochrome, ATS-friendly resume.
+# Use the following information to populate the resume.
+# Do NOT include any explanation, instructions, or text outside LaTeX code. Only LaTeX.
+#
+# Name: {data.get('name')}
+# Role: {data.get('role')}
+# Tagline: {data.get('tagline')}
+# Bio: {data.get('bio')}
+#
+# Skills:
+# Technical: {technical_skills}
+# Soft: {soft_skills}
+#
+# Projects:
+# {projects_text}
+#
+# Experience:
+# {experience_text}
+#
+# Education:
+# {education_text}
+#
+# Contact:
+# Email: {data.get('email')}
+# LinkedIn: {data.get('linkedin')}
+# GitHub: {data.get('github')}
+# Twitter: {data.get('twitter')}
+# """
+#
+#     # --- GROQ LLM integration ---
+#     api_key = os.getenv("GROQ_API_KEY")
+#     if not api_key:
+#         raise ValueError("GROQ_API_KEY not found in environment variables")
+#
+#     response = client.chat.completions.create(
+#         model="openai/gpt-oss-20b",
+#         messages=[{"role": "user", "content": prompt}],
+#         temperature=0.6,
+#         max_tokens=6000
+#     )
+#
+#     choices = getattr(response, "choices", None)
+#     if not choices or not hasattr(choices[0], "message"):
+#         raise RuntimeError("Unexpected response from GROQ API")
+#
+#     latex_content = choices[0].message.content.strip()
+#     return latex_content
+
 def generate_latex_prompt(data: dict) -> str:
     """
-    Generates an ATS-friendly LaTeX resume from user input JSON via GROQ LLM.
-
-    Args:
-        data (dict): Resume input including name, role, tagline, bio, skills, projects, experience, education, contact.
-
-    Returns:
-        str: Raw LaTeX code of the resume.
+    Generates an ATS-optimized, exactly one-page LaTeX resume using AutoCV template.
+    Automatically expands or summarizes content to fit the page precisely.
+    Section order: Summary → Technical Skills → Projects → Experience → Education
     """
-    # --- Build prompt for LLM ---
-    technical_skills = ', '.join([f"{s['skill']}({s['weight']})" for s in data.get('skills', {}).get('technical', [])])
-    soft_skills = ', '.join([f"{s['skill']}" for s in data.get('skills', {}).get('soft', [])])
 
-    projects_text = ''.join([f"- {p['title']}: {p['desc']}\n" for p in data.get('projects', [])])
-    experience_text = ''.join(
-        [f"- {e['role']} at {e['company']} ({e['duration']}): {e['desc']}\n" for e in data.get('experience', [])])
-    education_text = ''.join(
-        [f"- {ed['degree']} from {ed['institution']} ({ed['year']})\n" for ed in data.get('education', [])])
+    # --- Structured Text Assembly ---
+    tech_skills = ', '.join([f"{s['skill']} ({s['weight']})" for s in data.get('skills', {}).get('technical', [])])
+    soft_skills = ', '.join([s['skill'] for s in data.get('skills', {}).get('soft', [])])
 
+    projects_text = '\n'.join([f"- {p['title']}: {p['desc']}" for p in data.get('projects', [])])
+    experience_text = '\n'.join([f"- {e['role']} at {e['company']} ({e['duration']}): {e['desc']}"
+                                 for e in data.get('experience', [])])
+    education_text = '\n'.join([f"- {ed['degree']} from {ed['institution']} ({ed['year']})"
+                                 for ed in data.get('education', [])])
+
+    # --- Adaptive Prompt ---
     prompt = f"""
-Generate only the LaTeX code for a classic, one-column, fully monochrome, ATS-friendly resume. 
-Use the following information to populate the resume. 
-Do NOT include any explanation, instructions, or text outside LaTeX code. Only LaTeX.
+Generate ONLY the LaTeX code for a **one-page**, ATS-friendly resume using the AutoCV template.
+Do NOT include any explanation, comments, or text outside the LaTeX code.
 
+Strict Requirements:
+- The final output must fit **exactly one page** — not less, not more.
+- Use AutoCV template commands for structure (sections, spacing, font).
+- Adjust font size, line spacing, and margins automatically if needed.
+- If content is too short → rephrase or elaborate existing lines to fill space.
+- If content is too long → summarize or compress longer bullet points.
+- Never invent new information.
+- Maintain a professional, neutral, readable tone.
+- Ensure all text is plain-text parsable (ATS-safe: no icons, symbols, or color).
+
+Section Order:
+1. Summary (expanded version of Bio)
+2. Technical Skills
+3. Projects
+4. Experience
+5. Education
+
+Resume Data:
 Name: {data.get('name')}
 Role: {data.get('role')}
 Tagline: {data.get('tagline')}
-Bio: {data.get('bio')}
+Bio (for Summary): {data.get('bio')}
 
-Skills:
-Technical: {technical_skills}
-Soft: {soft_skills}
+Technical Skills:
+{tech_skills}
+Soft Skills:
+{soft_skills}
 
 Projects:
 {projects_text}
@@ -67,7 +152,7 @@ GitHub: {data.get('github')}
 Twitter: {data.get('twitter')}
 """
 
-    # --- GROQ LLM integration ---
+    # --- GROQ API Call ---
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY not found in environment variables")
@@ -75,8 +160,8 @@ Twitter: {data.get('twitter')}
     response = client.chat.completions.create(
         model="openai/gpt-oss-20b",
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.6,
-        max_tokens=6000
+        temperature=0.5,
+        max_tokens=7000
     )
 
     choices = getattr(response, "choices", None)
@@ -136,6 +221,7 @@ Return the result as a JSON object with keys:
         result_json = {"raw_text": content}
 
     return result_json
+
 
 def keyword_gap_analysis(resume_text: str, job_description: str) -> Dict:
     """
