@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.db import transaction
 from django.shortcuts import render
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
@@ -8,9 +9,10 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from app.core.views import CustomPageNumberPagination
 from app.global_constants import ErrorMessage, SuccessMessage
-from app.job_source.models import Source
+from app.job_source.models import Source, UserSource
 from app.job_source.serializers import SourceCreateSerializer, SourceDisplaySerializer, SourceUpdateSerializer, \
-    SourceListFilterDisplaySerializer, SourceListSerializer
+    SourceListFilterDisplaySerializer, SourceListSerializer, UserSourceSelectSerializer, \
+    UserSourceSelectDisplaySerializer
 from app.utils import get_response_schema
 from permissions import IsSuperAdmin
 
@@ -154,3 +156,101 @@ class SourceListAPIView(GenericAPIView):
         source_queryset = Source.objects.filter(is_active=True).order_by("-updated")
         serializer = SourceListSerializer(source_queryset, many=True)
         return get_response_schema(serializer.data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+
+class SourceSelectAPIView(GenericAPIView):
+    """Source: Select"""
+    permission_classes = [IsSuperAdmin]
+
+    source_item_schema = openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['source', 'freq', 'alert'],
+        properties={
+            'source': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID of the job source'),
+            'frequency': openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description='Frequency of alerts',
+                enum=['Once', 'Daily', 'Weekly', 'Monthly']
+            ),
+            'alert': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Enable or disable alert')
+        }
+    )
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=source_item_schema,
+            description='List of user source preferences'
+        )
+    )
+    def post(self, request):
+
+
+        with transaction.atomic():
+            for source in request.data:
+                source["user"] = request.user.id
+                serializer = UserSourceSelectSerializer(data=source)
+                if serializer.is_valid():
+                    serializer.save()
+                else:
+                    transaction.set_rollback(True)
+                    return get_response_schema(serializer.errors, ErrorMessage.BAD_REQUEST.value, status.HTTP_400_BAD_REQUEST)
+
+        return get_response_schema({}, SuccessMessage.RECORD_CREATED.value, status.HTTP_201_CREATED)
+
+
+class UserSourceSelectAPIView(GenericAPIView):
+    """User Source: Select"""
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        user_source_queryset = UserSource.objects.select_related("source").filter(is_active=True, user_id=request.user.id).order_by("-updated")
+        serializer = UserSourceSelectDisplaySerializer(user_source_queryset, many=True)
+        return get_response_schema(serializer.data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+
+class UserSourceUpdateAPIView(GenericAPIView):
+    """User Source: Update"""
+    permission_classes = [IsSuperAdmin]
+
+    source_item_schema = openapi.Schema(
+        type=openapi.TYPE_OBJECT,
+        required=['source', 'freq', 'alert'],
+        properties={
+            'source': openapi.Schema(type=openapi.TYPE_INTEGER, description='ID of the job source'),
+            'frequency': openapi.Schema(
+                type=openapi.TYPE_STRING,
+                description='Frequency of alerts',
+                enum=['Once', 'Daily', 'Weekly', 'Monthly']
+            ),
+            'alert': openapi.Schema(type=openapi.TYPE_BOOLEAN, description='Enable or disable alert')
+        }
+    )
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_ARRAY,
+            items=source_item_schema,
+            description='List of user source preferences'
+        )
+    )
+    def post(self, request):
+
+
+
+        with transaction.atomic():
+
+            #delete existing user source
+            UserSource.objects.filter(user_id=request.user.id).delete()
+
+            for source in request.data:
+                source["user"] = request.user.id
+                serializer = UserSourceSelectSerializer(data=source)
+                if serializer.is_valid():
+                    serializer.save()
+                else:
+                    transaction.set_rollback(True)
+                    return get_response_schema(serializer.errors, ErrorMessage.BAD_REQUEST.value, status.HTTP_400_BAD_REQUEST)
+
+        return get_response_schema({}, SuccessMessage.RECORD_CREATED.value, status.HTTP_201_CREATED)
+

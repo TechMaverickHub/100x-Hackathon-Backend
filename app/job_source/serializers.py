@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from app.job_source.models import Source
+from app.job_source.models import Source, UserSource
 
 
 class SourceCreateSerializer(serializers.ModelSerializer):
@@ -31,3 +31,16 @@ class SourceListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Source
         fields = ('pk', 'name',)
+
+class UserSourceSelectSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserSource
+        fields = ('pk', 'user', 'source', 'frequency', 'alert')
+
+
+class UserSourceSelectDisplaySerializer(serializers.ModelSerializer):
+
+    source = SourceDisplaySerializer()
+    class Meta:
+        model = UserSource
+        fields = ('pk', 'source', 'frequency', 'alert')
