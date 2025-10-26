@@ -100,6 +100,8 @@ class UserDisplaySerializer(serializers.ModelSerializer):
 class UserListFilterDisplaySerializer(serializers.ModelSerializer):
     """ Serializer: Display user details """
 
+    resume_file = serializers.FileField(read_only=True)
+
     class Meta:
         model = get_user_model()
         fields = (
@@ -110,7 +112,8 @@ class UserListFilterDisplaySerializer(serializers.ModelSerializer):
             'created',
             'is_active',
             'linkedin_url',
-            'github_url'
+            'github_url',
+            'resume_file'
 
 
         )
