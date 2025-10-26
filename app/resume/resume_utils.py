@@ -335,15 +335,41 @@ Job Description:
 
 def generate_skill_gap(resume_text: str, job_description: str) -> Dict:
     """
-    Compare resume against job description and return matched and missing skills.
-    Returns structured JSON with keys: missing_skills, matched_skills, gap_score.
+    Compare resume against job description and return matched, missing, and extended skill insights.
+    Returns structured JSON with keys:
+    - matched_skills
+    - missing_skills
+    - gap_score
+    - match_percent
+    - summary
+    - comparative_insight
+    - trend_insight
+    - visual_summary
     """
     prompt = f"""
-Extract the skills from the job description and compare them to the resume.
-Return three keys in JSON:
-1. "matched_skills": skills present in both resume and job description
-2. "missing_skills": skills required by the job but missing in the resume
-3. "gap_score": fraction of required skills missing (0-1)
+Extract and compare the skills from the job description and the resume.
+Return a structured JSON with the following keys:
+
+1. "matched_skills": skills present in both resume and job description.
+2. "missing_skills": skills required by the job but missing in the resume.
+3. "gap_score": fraction of required skills missing (0-1).
+4. "match_percent": percentage of required skills matched (integer 0–100).
+5. "summary": a one- or two-sentence summary explaining the skill match and improvement suggestion.
+6. "comparative_insight": {{
+       "average_match_percent_for_role": integer,
+       "market_position": one of ["Above average", "Average", "Slightly below average", "Below average"],
+       "insight": short text describing how this resume compares to other candidates.
+   }}
+7. "trend_insight": {{
+       "emerging_skills": list of new or trending skills relevant to this role,
+       "high_demand_skills": list of in-demand skills mentioned in the job description,
+       "insight": one-sentence summary highlighting which missing skills matter most.
+   }}
+8. "visual_summary": {{
+       "show_progress_bar": true,
+       "color_code": one of ["success", "warning", "danger"] depending on skill match level,
+       "label": formatted text like "Skill Match: 67%"
+   }}
 
 Resume:
 {resume_text}
@@ -351,14 +377,31 @@ Resume:
 Job Description:
 {job_description}
 
-**Important instructions for JSON robustness**:
+**Important JSON formatting rules**:
 - Use double quotes for all keys and strings.
-- Return only the JSON; do not add extra text or explanations.
+- Do not include explanations, markdown, or text outside the JSON.
 - Example structure:
 {{
-    "matched_skills": ["Python"],
+    "matched_skills": ["Python", "Django"],
     "missing_skills": ["SQL", "Machine Learning"],
-    "gap_score": 0.33
+    "gap_score": 0.33,
+    "match_percent": 67,
+    "summary": "You match 67% of the skills required. Adding SQL and Machine Learning would improve your alignment.",
+    "comparative_insight": {{
+        "average_match_percent_for_role": 72,
+        "market_position": "Slightly below average",
+        "insight": "Most applicants for similar roles include ML or SQL experience."
+    }},
+    "trend_insight": {{
+        "emerging_skills": ["Generative AI", "Prompt Engineering"],
+        "high_demand_skills": ["Machine Learning", "SQL"],
+        "insight": "Machine Learning and SQL are trending upward in demand for this role."
+    }},
+    "visual_summary": {{
+        "show_progress_bar": true,
+        "color_code": "warning",
+        "label": "Skill Match: 67%"
+    }}
 }}
 """
 
@@ -373,7 +416,6 @@ Job Description:
         return json.loads(content)
     except json.JSONDecodeError:
         return {"raw_text": content}
-
 
 def generate_career_recommendation(resume_text: str, job_description: str) -> Dict:
     """
