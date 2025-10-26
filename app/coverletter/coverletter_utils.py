@@ -22,14 +22,22 @@ def generate_cover_letter(resume_text: str, job_description: str, tone="Professi
 
     # Base prompt
     prompt = f"""
-    You are an expert career advisor. Using the following resume and job description,
-    generate a concise, professional cover letter tailored to the job application.
+    You are an expert career advisor specialized in writing highly effective, ATS-friendly cover letters. 
+    Using the resume and job description below, generate a **concise, professional cover letter** that would fit a single page. 
+
+    Requirements:
+    - Highlight the candidate's most relevant achievements with measurable results.
+    - Mirror the key skills and qualifications from the job description.
+    - Keep a strictly professional tone, emphasizing the value the candidate brings to the company.
+    - Avoid filler; every sentence should demonstrate impact or relevance.
 
     Resume:
     {resume_text}
 
     Job Description:
     {job_description}
+
+    Output only the cover letter text.
     """
 
     # Add tone if provided
