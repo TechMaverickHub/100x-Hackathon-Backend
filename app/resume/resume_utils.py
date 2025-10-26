@@ -332,3 +332,105 @@ Job Description:
         return json.loads(content)
     except json.JSONDecodeError:
         return {"raw_text": content}
+
+def generate_skill_gap(resume_text: str, job_description: str) -> Dict:
+    """
+    Compare resume against job description and return matched and missing skills.
+    Returns structured JSON with keys: missing_skills, matched_skills, gap_score.
+    """
+    prompt = f"""
+Extract the skills from the job description and compare them to the resume.
+Return three keys in JSON:
+1. "matched_skills": skills present in both resume and job description
+2. "missing_skills": skills required by the job but missing in the resume
+3. "gap_score": fraction of required skills missing (0-1)
+
+Resume:
+{resume_text}
+
+Job Description:
+{job_description}
+
+**Important instructions for JSON robustness**:
+- Use double quotes for all keys and strings.
+- Return only the JSON; do not add extra text or explanations.
+- Example structure:
+{{
+    "matched_skills": ["Python"],
+    "missing_skills": ["SQL", "Machine Learning"],
+    "gap_score": 0.33
+}}
+"""
+
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    content = response.choices[0].message.content.strip()
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"raw_text": content}
+
+
+def generate_career_recommendation(resume_text: str, job_description: str) -> Dict:
+    """
+    Analyze the candidate's resume and the job description to generate personalized
+    career growth recommendations, suggested learning paths, and actionable advice.
+
+    Returns structured JSON with keys:
+    - "career_paths": list of recommended roles or directions
+    - "recommended_courses": list of course suggestions with title, platform, and link
+    - "advice": concise personalized guidance summary
+    """
+    prompt = f"""
+Analyze the candidate's resume in relation to the following job description
+and provide personalized career recommendations in structured JSON.
+
+Resume:
+{resume_text}
+
+Job Description:
+{job_description}
+
+You must:
+1. Identify what roles or career directions suit the candidate based on their background.
+2. Suggest 3-5 upskilling or certification courses (Coursera, Udemy, LinkedIn Learning, etc.)
+   that help fill the gap between their profile and the target job.
+3. Give one concise, actionable advice paragraph (1-2 sentences max).
+
+**Important instructions for JSON robustness**:
+- Use double quotes for all keys and strings.
+- Return only the JSON; do not add extra explanations.
+- Example structure:
+{{
+    "career_paths": ["Data Analyst", "Machine Learning Engineer"],
+    "recommended_courses": [
+        {{
+            "title": "SQL for Data Science",
+            "platform": "Coursera",
+            "link": "https://www.coursera.org/learn/sql-for-data-science"
+        }},
+        {{
+            "title": "Machine Learning A-Z",
+            "platform": "Udemy",
+            "link": "https://www.udemy.com/course/machinelearning"
+        }}
+    ],
+    "advice": "Focus on building end-to-end ML projects using Python and SQL to strengthen employability."
+}}
+"""
+
+    response = client.chat.completions.create(
+        model="openai/gpt-oss-20b",
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    content = response.choices[0].message.content.strip()
+
+    try:
+        return json.loads(content)
+    except json.JSONDecodeError:
+        return {"raw_text": content}

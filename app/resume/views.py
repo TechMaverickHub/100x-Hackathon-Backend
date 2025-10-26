@@ -7,7 +7,7 @@ from rest_framework.generics import GenericAPIView
 from app.global_constants import ErrorMessage, SuccessMessage
 from app.portfolio.portfolio_utils import get_file_type, extract_resume_text
 from app.resume.resume_utils import generate_latex_prompt, generate_resume_score, keyword_gap_analysis, \
-    auto_rewrite_resume
+    auto_rewrite_resume, generate_skill_gap, generate_career_recommendation
 from app.utils import get_response_schema
 from permissions import IsUser
 
@@ -272,7 +272,94 @@ class ResumeAutoRewriteAPIView(GenericAPIView):
 
         return get_response_schema( result, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
+class ResumeSkillsGapAPIView(GenericAPIView):
 
+    permission_classes = [IsUser]
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "job_description": openapi.Schema(type=openapi.TYPE_STRING, description="Job description"),
+            }
+        )
+    )
+    def post(self, request):
+
+        # check if job_Description is none
+        if "job_description" not in request.data:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.BAD_REQUEST.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        if not request.user.resume_file:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.RESUME_FILE_MISSING.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            file_path, file_type = get_file_type(request.user)
+        except ValueError:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.UNSUPPORTED_FILE_TYPE.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        resume_text = extract_resume_text(file_path, file_type)
+
+        result = generate_skill_gap(resume_text, request.data.get("job_description"))
+
+        return get_response_schema(result, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+
+class ResumeCareerRecommendationAPIView(GenericAPIView):
+
+    permission_classes = [IsUser]
+
+    @swagger_auto_schema(
+        request_body=openapi.Schema(
+            type=openapi.TYPE_OBJECT,
+            properties={
+                "job_description": openapi.Schema(type=openapi.TYPE_STRING, description="Job description"),
+            }
+        )
+    )
+    def post(self, request):
+
+        # check if job_Description is none
+        if "job_description" not in request.data:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.BAD_REQUEST.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        if not request.user.resume_file:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.RESUME_FILE_MISSING.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            file_path, file_type = get_file_type(request.user)
+        except ValueError:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.UNSUPPORTED_FILE_TYPE.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        resume_text = extract_resume_text(file_path, file_type)
+
+        result = generate_career_recommendation(resume_text, request.data.get("job_description"))
+
+        return get_response_schema(result, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
 
 
