@@ -1,7 +1,7 @@
 from django.urls import path
 
 from app.job_source.views import SourceCreateAPIView, SourceDetailAPIView, SourceListFilter, SourceListAPIView, \
-    SourceSelectAPIView, UserSourceSelectAPIView, UserSourceUpdateAPIView
+    SourceSelectAPIView, UserSourceSelectAPIView, UserSourceUpdateAPIView, GetJobAlertsAPIView
 
 urlpatterns = [
 
@@ -17,4 +17,6 @@ urlpatterns = [
     path("user-selection", UserSourceSelectAPIView.as_view(), name="user-source-select"),
     path("update-selection", UserSourceUpdateAPIView.as_view(), name="user-source-update"),
 
+
+    path("get-job-alerts", GetJobAlertsAPIView.as_view(), name="get-job-alerts"),
 ]

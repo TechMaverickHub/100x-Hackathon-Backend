@@ -9,10 +9,12 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from app.core.views import CustomPageNumberPagination
 from app.global_constants import ErrorMessage, SuccessMessage
+from app.job_source.job_source_utils import get_job_alerts_for_user
 from app.job_source.models import Source, UserSource
 from app.job_source.serializers import SourceCreateSerializer, SourceDisplaySerializer, SourceUpdateSerializer, \
     SourceListFilterDisplaySerializer, SourceListSerializer, UserSourceSelectSerializer, \
     UserSourceSelectDisplaySerializer
+from app.portfolio.portfolio_utils import extract_resume_text, get_file_type
 from app.utils import get_response_schema
 from permissions import IsSuperAdmin, IsUser
 
@@ -151,7 +153,6 @@ class SourceListAPIView(GenericAPIView):
     """Source: List"""
     permission_classes = [IsUser]
 
-
     def get(self, request):
         source_queryset = Source.objects.filter(is_active=True).order_by("-updated")
         serializer = SourceListSerializer(source_queryset, many=True)
@@ -185,7 +186,6 @@ class SourceSelectAPIView(GenericAPIView):
     )
     def post(self, request):
 
-
         with transaction.atomic():
             for source in request.data:
                 source["user"] = request.user.id
@@ -194,7 +194,8 @@ class SourceSelectAPIView(GenericAPIView):
                     serializer.save()
                 else:
                     transaction.set_rollback(True)
-                    return get_response_schema(serializer.errors, ErrorMessage.BAD_REQUEST.value, status.HTTP_400_BAD_REQUEST)
+                    return get_response_schema(serializer.errors, ErrorMessage.BAD_REQUEST.value,
+                                               status.HTTP_400_BAD_REQUEST)
 
         return get_response_schema({}, SuccessMessage.RECORD_CREATED.value, status.HTTP_201_CREATED)
 
@@ -236,11 +237,9 @@ class UserSourceUpdateAPIView(GenericAPIView):
     )
     def post(self, request):
 
-
-
         with transaction.atomic():
 
-            #delete existing user source
+            # delete existing user source
             UserSource.objects.filter(user_id=request.user.id).delete()
 
             for source in request.data:
@@ -250,7 +249,36 @@ class UserSourceUpdateAPIView(GenericAPIView):
                     serializer.save()
                 else:
                     transaction.set_rollback(True)
-                    return get_response_schema(serializer.errors, ErrorMessage.BAD_REQUEST.value, status.HTTP_400_BAD_REQUEST)
+                    return get_response_schema(serializer.errors, ErrorMessage.BAD_REQUEST.value,
+                                               status.HTTP_400_BAD_REQUEST)
 
         return get_response_schema({}, SuccessMessage.RECORD_CREATED.value, status.HTTP_201_CREATED)
+
+
+class GetJobAlertsAPIView(GenericAPIView):
+    """Get Job Alerts"""
+    permission_classes = [IsUser]
+
+    def post(self, request):
+        # Check if the user has resume file
+        if not request.user.resume_file:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.RESUME_FILE_MISSING.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            file_path, file_type = get_file_type(request.user)
+        except ValueError:
+            return get_response_schema(
+                {settings.REST_FRAMEWORK['NON_FIELD_ERRORS_KEY']: [ErrorMessage.UNSUPPORTED_FILE_TYPE.value]},
+                ErrorMessage.BAD_REQUEST.value,
+                status.HTTP_400_BAD_REQUEST
+            )
+
+        resume_text = extract_resume_text(file_path, file_type)
+
+        job_alerts = get_job_alerts_for_user(resume_text, request.user)
+        return get_response_schema(job_alerts, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
