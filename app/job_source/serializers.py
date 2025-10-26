@@ -25,3 +25,9 @@ class SourceListFilterDisplaySerializer(serializers.ModelSerializer):
     class Meta:
         model = Source
         fields = ('pk', 'name', 'api_url', 'rss_url', 'created')
+
+
+class SourceListSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Source
+        fields = ('pk', 'name',)

@@ -10,7 +10,7 @@ from app.core.views import CustomPageNumberPagination
 from app.global_constants import ErrorMessage, SuccessMessage
 from app.job_source.models import Source
 from app.job_source.serializers import SourceCreateSerializer, SourceDisplaySerializer, SourceUpdateSerializer, \
-    SourceListFilterDisplaySerializer
+    SourceListFilterDisplaySerializer, SourceListSerializer
 from app.utils import get_response_schema
 from permissions import IsSuperAdmin
 
@@ -40,7 +40,6 @@ class SourceCreateAPIView(GenericAPIView):
                 status.HTTP_400_BAD_REQUEST
             )
 
-
         serializer = SourceCreateSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -48,12 +47,13 @@ class SourceCreateAPIView(GenericAPIView):
 
         return get_response_schema(serializer.errors, ErrorMessage.BAD_REQUEST.value, status.HTTP_400_BAD_REQUEST)
 
+
 class SourceDetailAPIView(GenericAPIView):
     permission_classes = [IsSuperAdmin]
 
     def get_object(self, pk):
 
-        source_object = Source.objects.filter(pk=pk,is_active=True)
+        source_object = Source.objects.filter(pk=pk, is_active=True)
         if source_object:
             return source_object[0]
         return None
@@ -131,7 +131,6 @@ class SourceListFilter(ListAPIView):
         if rss_url:
             source_queryset = source_queryset.filter(rss_url__icontains=rss_url)
 
-
         return source_queryset
 
     @swagger_auto_schema(
@@ -144,3 +143,14 @@ class SourceListFilter(ListAPIView):
     )
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
+
+
+class SourceListAPIView(GenericAPIView):
+    """Source: List"""
+    permission_classes = [IsSuperAdmin]
+
+
+    def get(self, request):
+        source_queryset = Source.objects.filter(is_active=True).order_by("-updated")
+        serializer = SourceListSerializer(source_queryset, many=True)
+        return get_response_schema(serializer.data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
