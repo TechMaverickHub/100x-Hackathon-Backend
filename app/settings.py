@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'app.resume',
     'app.coverletter',
     'app.interview',
+    'app.job_source',
 ]
 
 MIDDLEWARE = [

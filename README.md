@@ -104,6 +104,8 @@ RESEND_API_KEY=
 ```bash
 python manage.py makemigrations user
 python manage.py makemigrations role
+python manage.py makemigrations job_source
+
 
 ```
 
