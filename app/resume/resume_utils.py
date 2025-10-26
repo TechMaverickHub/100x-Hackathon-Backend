@@ -419,17 +419,23 @@ Job Description:
 
 def generate_career_recommendation(resume_text: str, job_description: str) -> Dict:
     """
-    Analyze the candidate's resume and the job description to generate personalized
-    career growth recommendations, suggested learning paths, and actionable advice.
+    Analyze the candidate's resume and job description to generate personalized
+    career growth recommendations, suggested learning resources, and actionable advice.
 
     Returns structured JSON with keys:
-    - "career_paths": list of recommended roles or directions
-    - "recommended_courses": list of course suggestions with title, platform, and link
-    - "advice": concise personalized guidance summary
+    - "career_paths": list of recommended job-aligned roles
+    - "career_level": analysis of current vs target level (e.g., entry → mid-level)
+    - "recommended_courses": list of relevant upskilling or certification courses
+    - "recommended_blogs": list of key blogs or articles to follow
+    - "recommended_repos": list of GitHub repositories to study or contribute to
+    - "recommended_projects": list of practical project ideas for portfolio building
+    - "advice": concise personalized guidance summary (1–2 sentences)
+    - "next_steps": list of 3–5 actionable short-term steps
     """
     prompt = f"""
-Analyze the candidate's resume in relation to the following job description
-and provide personalized career recommendations in structured JSON.
+Analyze the candidate's resume and the following job description to recommend
+career paths, skill-building resources, and next actions. Tailor everything
+toward the target job role described.
 
 Resume:
 {resume_text}
@@ -438,17 +444,27 @@ Job Description:
 {job_description}
 
 You must:
-1. Identify what roles or career directions suit the candidate based on their background.
-2. Suggest 3-5 upskilling or certification courses (Coursera, Udemy, LinkedIn Learning, etc.)
-   that help fill the gap between their profile and the target job.
-3. Give one concise, actionable advice paragraph (1-2 sentences max).
+1. Suggest 1–3 suitable career paths aligned with the candidate's current skills and target job.
+2. Assess the candidate's current career level vs. target level (e.g., "mid-level aiming for senior role").
+3. Recommend 3–5 upskilling or certification courses (Coursera, Udemy, LinkedIn Learning, etc.).
+4. Recommend 2–3 blogs or knowledge hubs to follow (with title, short description, link).
+5. Recommend 2–3 GitHub repositories relevant to the target job (with short description, link).
+6. Suggest 2–3 project ideas that would strengthen their portfolio for this role.
+7. Provide one concise "advice" paragraph (1–2 sentences).
+8. Provide a "next_steps" list of 3–5 actionable tasks (e.g., "Add SQL project", "Refactor GitHub portfolio").
 
 **Important instructions for JSON robustness**:
 - Use double quotes for all keys and strings.
-- Return only the JSON; do not add extra explanations.
+- Return only the JSON; no commentary or explanations.
+- Keep all text concise and role-specific.
 - Example structure:
 {{
     "career_paths": ["Data Analyst", "Machine Learning Engineer"],
+    "career_level": {{
+        "current_level": "Entry-level",
+        "target_level": "Mid-level",
+        "insight": "The candidate has strong programming skills but lacks applied ML experience."
+    }},
     "recommended_courses": [
         {{
             "title": "SQL for Data Science",
@@ -461,7 +477,48 @@ You must:
             "link": "https://www.udemy.com/course/machinelearning"
         }}
     ],
-    "advice": "Focus on building end-to-end ML projects using Python and SQL to strengthen employability."
+    "recommended_blogs": [
+        {{
+            "title": "Towards Data Science",
+            "description": "Practical guides and industry insights for data professionals.",
+            "link": "https://towardsdatascience.com/"
+        }},
+        {{
+            "title": "Analytics Vidhya",
+            "description": "Data science tutorials and career growth insights.",
+            "link": "https://www.analyticsvidhya.com/blog/"
+        }}
+    ],
+    "recommended_repos": [
+        {{
+            "title": "Awesome Machine Learning",
+            "description": "Curated list of top ML frameworks and projects.",
+            "link": "https://github.com/josephmisiti/awesome-machine-learning"
+        }},
+        {{
+            "title": "Data Science Portfolio Template",
+            "description": "Portfolio starter repo for showcasing data projects.",
+            "link": "https://github.com/username/datascience-portfolio"
+        }}
+    ],
+    "recommended_projects": [
+        {{
+            "title": "Customer Churn Prediction",
+            "description": "Build an ML model to predict customer churn using Python."
+        }},
+        {{
+            "title": "Job Skill Extraction NLP App",
+            "description": "Develop a resume parser that extracts and matches skills to job descriptions."
+        }}
+    ],
+    "advice": "Focus on demonstrating end-to-end data project delivery to reach mid-level expectations.",
+    "next_steps": [
+        "Add an SQL project to portfolio.",
+        "Refactor GitHub repositories for readability.",
+        "Start contributing to open ML repos.",
+        "Follow 2–3 key industry blogs.",
+        "Complete a structured ML course."
+    ]
 }}
 """
 
