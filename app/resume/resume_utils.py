@@ -5,6 +5,8 @@ from typing import Dict, Optional
 from dotenv import load_dotenv
 from groq import Groq
 
+import re
+
 load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
@@ -86,7 +88,6 @@ Important instructions for JSON robustness:
 #     latex_content = choices[0].message.content.strip()
 #     return latex_content
 
-import re
 
 
 def _limit_items(items, max_items, min_items=None):
