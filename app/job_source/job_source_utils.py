@@ -28,7 +28,22 @@ def fetch_jobs_from_rss(url: str, limit: int = 5):
         })
     return jobs
 
-def match_jobs_to_resume(user_resume_text: str, jobs: List[Dict], top_k: int = 5) -> List[Dict]:
+def _truncate_text(text: str, max_chars: int = 4000) -> str:
+    """
+    Reduce input size to stay within LLM token limits.
+    """
+    if not text:
+        return ""
+    return text[:max_chars]
+
+
+def match_jobs_to_resume(
+    user_resume_text: str,
+    jobs: List[Dict],
+    top_k: int = 5,
+    max_jobs_per_call: int = 5,
+    max_job_chars: int = 2000,
+) -> List[Dict]:
     """
     Match user's resume with job descriptions using Groq LLM semantic scoring.
 
@@ -46,7 +61,10 @@ def match_jobs_to_resume(user_resume_text: str, jobs: List[Dict], top_k: int = 5
 
     matched_jobs = []
 
-    for job in jobs:
+    limited_jobs = jobs[:max_jobs_per_call]
+
+    for job in limited_jobs:
+        job_description = _truncate_text(job.get("description", ""), max_job_chars)
         # --- Build structured prompt ---
         prompt = f"""
 You are an AI job-matching assistant.
@@ -61,7 +79,7 @@ Resume:
 {user_resume_text}
 
 Job Description:
-{job['description']}
+{job_description}
 
 Return only JSON.
 Example format:
@@ -75,6 +93,8 @@ Example format:
         response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
             messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            top_p=0.9,
         )
 
         content = response.choices[0].message.content.strip()
@@ -107,7 +127,9 @@ def get_job_alerts_for_user(resume_text, user, max_jobs_per_source: int = 5):
     """
     user_sources = user.job_sources.values("source__name", "source__rss_url")
 
-    all_jobs = []
+    all_matches = []
+    resume_snippet = _truncate_text(resume_text)
+    top_matches_per_source = max(1, min(3, max_jobs_per_source))
     for source in user_sources:
         rss_url = source.get("source__rss_url")
         source_name = source.get("source__name")
@@ -118,16 +140,21 @@ def get_job_alerts_for_user(resume_text, user, max_jobs_per_source: int = 5):
         try:
             print(f"Fetching top {max_jobs_per_source} jobs from {source_name}: {rss_url}")
             jobs = fetch_jobs_from_rss(rss_url, limit=max_jobs_per_source)
-            all_jobs.extend(jobs)
+            if not jobs:
+                continue
+
+            matched_jobs = match_jobs_to_resume(
+                user_resume_text=resume_snippet,
+                jobs=jobs,
+                top_k=top_matches_per_source
+            )
+            all_matches.extend(matched_jobs)
         except Exception as e:
             print(f"Error fetching from {source_name}: {e}")
 
-    if not all_jobs:
+    if not all_matches:
         print("No jobs fetched from any active sources.")
         return []
 
-    # Limit total jobs sent to LLM to avoid long delays
-    all_jobs = all_jobs[:10]
-    print(f"Matching {len(all_jobs)} jobs using LLM...")
-
-    return match_jobs_to_resume(resume_text, all_jobs, top_k=5)
+    all_matches.sort(key=lambda x: x["score"], reverse=True)
+    return all_matches[:5]
