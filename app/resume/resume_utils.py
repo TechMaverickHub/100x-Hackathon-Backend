@@ -86,85 +86,174 @@ Important instructions for JSON robustness:
 #     latex_content = choices[0].message.content.strip()
 #     return latex_content
 
+import re
+
+
+def _limit_items(items, max_items, min_items=None):
+    if not items:
+        return []
+    limited = items[:max_items]
+    if min_items and len(limited) < min_items:
+        limited = items[:min_items]
+    return limited
+
+
+def _limit_bullets(lines, max_lines, max_chars):
+    if not lines:
+        return []
+    trimmed = []
+    for line in lines:
+        clean = line.strip()
+        if not clean:
+            continue
+        trimmed.append(clean[:max_chars].rstrip())
+        if len(trimmed) >= max_lines:
+            break
+    return trimmed
+
+
+def _split_sentences(text: str):
+    if not text:
+        return []
+    candidates = re.split(r'(?<=[.!?])\s+|\n+', text)
+    lines = [candidate.strip() for candidate in candidates if candidate.strip()]
+    return lines
+
+
+def _format_itemize_block(lines):
+    if not lines:
+        return ""
+    bullet_lines = "".join([f"    \\item {line}\n" for line in lines])
+    return "\\begin{itemize}\n" + bullet_lines + "\\end{itemize}\n"
+
+
 def generate_latex_prompt(data: dict) -> str:
     """
-    Generates an ATS-optimized, exactly one-page LaTeX resume.
-    Section order: Summary → Technical Skills → Projects → Experience → Education → Certifications (if any)
-    Automatically expands or summarizes content to fit one page.
-    Compatible with Python 3.11+.
+    Generates an ATS-optimized LaTeX resume that fits exactly one page.
+    Applies deterministic trimming to keep each section within tight bounds
+    before delegating fine-grained control to the LLM.
     """
 
-    # --- Structured Text Assembly ---
-    tech_skills = ', '.join([f"{s['skill']} ({s['weight']})" for s in data.get('skills', {}).get('technical', [])])
-    soft_skills = ', '.join([s['skill'] for s in data.get('skills', {}).get('soft', [])])
-    soft_skills_line = f"\\\\{soft_skills}" if soft_skills else ""
+    # --- Configurable caps to maintain one-page layout ---
+    summary_max_chars = 1500
+    tech_skill_cap = 15
+    soft_skill_cap = 12
+    project_cap = 4
+    project_bullet_cap = 4
+    experience_cap = 4
+    experience_bullet_cap = 5
+    education_cap = 3
+    bullet_char_cap = 220
 
-    projects_text = "".join([
-        f"\\noindent\\textbf{{{p['title']}}} \\\\ \n\\begin{{itemize}}\n" +
-        "".join([f"    \\item {line}\n" for line in p.get('desc_lines', [p['desc']])]) +
-        "\\end{itemize}\n"
-        for p in data.get('projects', [])
-    ])
-
-    experience_text = "".join([
-        f"\\noindent\\textbf{{{e['role']} at {e['company']}}} \\hfill {e['duration']} \\\\\n" +
-        (f"\\textit{{{e.get('location', '')}}} \\\\\n" if e.get('location') else "") +
-        "\\begin{itemize}\n" +
-        "".join([f"    \\item {line}\n" for line in e.get('desc_lines', [e['desc']])]) +
-        "\\end{itemize}\n"
-        for e in data.get('experience', [])
-    ])
-
-    education_text = "".join([
-        f"\\noindent \\textbf{{{ed['degree']} from {ed['institution']}}} \\hfill {ed['year']} \n"
-        for ed in data.get('education', [])
-    ])
+    # --- Summary / Bio ---
+    summary_text_raw = (data.get('bio') or "").strip()
+    summary_sentences = _split_sentences(summary_text_raw)
+    if not summary_sentences:
+        summary_sentences = [summary_text_raw]
+    min_summary_sentences = 4
+    max_summary_sentences = 6
+    if len(summary_sentences) < min_summary_sentences:
+        summary_sentences = summary_sentences + summary_sentences[:1] * (min_summary_sentences - len(summary_sentences))
+    summary_sentences = summary_sentences[:max_summary_sentences]
+    summary_text = " ".join(summary_sentences)
+    summary_text = summary_text[:summary_max_chars]
+    summary_hint = ""
+    if len(summary_text_raw) < 400:
+        summary_hint = "%% Expand summary to 4-6 sentences referencing skills, impact, and industries.\n"
 
     # --- Build contact links ---
     contact_links_list = []
     if data.get('email'):
         contact_links_list.append(f"\\href{{mailto:{data['email']}}}{{Email}}")
-    if data.get('links', {}).get('LinkedIn'):
-        contact_links_list.append(f"\\href{{{data['links']['LinkedIn']}}}{{LinkedIn}}")
-    if data.get('links', {}).get('GitHub'):
-        contact_links_list.append(f"\\href{{{data['links']['GitHub']}}}{{GitHub}}")
-    if data.get('links', {}).get('Twitter'):
-        contact_links_list.append(f"\\href{{{data['links']['Twitter']}}}{{Twitter}}")
-
+    for label in ("LinkedIn", "GitHub", "Portfolio", "Website", "Twitter"):
+        link = data.get('links', {}).get(label)
+        if link:
+            contact_links_list.append(f"\\href{{{link}}}{{{label}}}")
     contact_links = " | ".join(contact_links_list)
+
+    # --- Structured Text Assembly ---
+    technical_skills = _limit_items(data.get('skills', {}).get('technical', []), tech_skill_cap)
+    soft_skills = _limit_items(data.get('skills', {}).get('soft', []), soft_skill_cap)
+
+    tech_skill_text = ', '.join([f"{s['skill']} ({s['weight']})" for s in technical_skills])
+    soft_skill_text = ', '.join([s['skill'] for s in soft_skills])
+    soft_skills_line = f"\\\\{soft_skill_text}" if soft_skill_text else ""
+
+    projects = []  # each entry: (latex_block, min_required_bullets)
+    for project in _limit_items(data.get('projects', []), project_cap):
+        bullet_lines = project.get('desc_lines') or []
+        if not bullet_lines:
+            bullet_lines = _split_sentences(project.get('desc', ''))
+        if not bullet_lines:
+            bullet_lines = [project.get('desc', '')]
+        lines = _limit_bullets(bullet_lines, project_bullet_cap, bullet_char_cap)
+        context_note = ""
+        if len(lines) <= 1:
+            context_note = "%% Expand to at least two bullet points using provided details.\n"
+        projects.append(
+    f"\\noindent\\textbf{{{project.get('title', 'Project')}}} \\\\ \n"
+            + context_note
+            + _format_itemize_block(lines)
+        )
+    projects_text = "".join(projects)
+
+    experiences = []
+    for exp in _limit_items(data.get('experience', []), experience_cap):
+        bullet_lines = exp.get('desc_lines') or []
+        if not bullet_lines:
+            bullet_lines = _split_sentences(exp.get('desc', ''))
+        if not bullet_lines:
+            bullet_lines = [exp.get('desc', '')]
+        bullets = _limit_bullets(bullet_lines, experience_bullet_cap, bullet_char_cap)
+        context_note = ""
+        if len(bullets) <= 2:
+            context_note = "%% Elaborate responsibilities/results to reach 3-5 bullets.\n"
+        header = f"\\noindent\\textbf{{{exp.get('role', 'Role')} at {exp.get('company', 'Company')}}} \\hfill {exp.get('duration', '')} \\\\\n"
+        location_line = f"\\textit{{{exp.get('location', '')}}} \\\\\n" if exp.get('location') else ""
+        experiences.append(header + location_line + context_note + _format_itemize_block(bullets))
+    experience_text = "".join(experiences)
+
+    education = []
+    for edu in _limit_items(data.get('education', []), education_cap):
+        education.append(
+            f"\\noindent \\textbf{{{edu.get('degree', 'Degree')} from {edu.get('institution', 'Institution')}}} \\hfill {edu.get('year', '')} \n"
+        )
+    education_text = "".join(education)
 
     # --- Adaptive One-Page Prompt ---
     prompt = f"""
-Generate ONLY the LaTeX code for a one-page, ATS-friendly resume.
-Do NOT include any explanation or text outside LaTeX code.
+Generate ONLY LaTeX code for a one-page, ATS-friendly resume.
+Do NOT include any commentary.
 
 \\documentclass[10pt,a4paper]{{article}}
 \\usepackage{{geometry}}
-\\geometry{{a4paper, margin=0.5in}}
+\\geometry{{a4paper, top=0.55in, bottom=0.55in, left=0.55in, right=0.55in}}
 \\usepackage{{enumitem}}
 \\usepackage{{hyperref}}
+\\usepackage{{titlesec}}
 \\linespread{{0.95}}
 \\setlength{{\\parskip}}{{0pt}}
 \\setlist[itemize]{{noitemsep, topsep=0pt, left=0.15in}}
+\\titleformat*{{\\section}}{{\\large\\bfseries}}
 \\pagenumbering{{gobble}}
 \\renewcommand{{\\labelitemi}}{{--}}
 
 \\begin{{document}}
 
 \\begin{{center}}
-    {{\\LARGE \\textbf{{{data.get('name')}}}}} \\\\[0.15cm]
-    {data.get('role')} | {data.get('tagline', '')} \\\\[0.15cm]
+    {{\\LARGE \\textbf{{{data.get('name', '')}}}}} \\\\[0.15cm]
+    {data.get('role', '')} | {data.get('tagline', '')} \\\\[0.15cm]
     {data.get('location', '')} | {data.get('phone', '')} \\\\
     {contact_links}
 \\end{{center}}
 
-\\vspace{{0.2cm}}
+\\vspace{{0.15cm}}
 
 \\section*{{Summary}}
-{data.get('bio', '')}
+{summary_hint}{summary_text}
 
 \\section*{{Skills}}
-{tech_skills}
+{tech_skill_text}
 {soft_skills_line}
 
 \\section*{{Projects}}
@@ -178,13 +267,16 @@ Do NOT include any explanation or text outside LaTeX code.
 
 \\end{{document}}
 
-Instructions for LLM to ensure strict one-page output:
-1. All sections must appear in this order: Summary →  Skills → Projects → Experience → Education.
-2. If the content is too short to fill one page, slightly expand/rephrase **existing content only**, adding context or measurable details, but do NOT invent new content.
-3. If the content is too long, summarize bullets starting from lowest-priority sections: Education →  Skills → Projects → Experience → Summary. Condense bullets into single lines, preserving meaning.
-4. Bullets in Projects and Experience should never be split across pages.
-5. Do not adjust margins, font size, or line spacing — maintain defaults.
-6. The final LaTeX output must strictly fit **exactly one page** and remain ATS-friendly.
+STRICT FORMAT RULES (must comply to keep resume exactly one page):
+1. DO NOT change margins, font sizes, or spacing defined above.
+2. Ensure the compiled output uses the entire single page—neither spilling to a second page nor leaving noticeable blank regions.
+3. Ensure the summary spans 4–6 sentences highlighting skills, domains, and measurable impact derived from the provided bio.
+4. For every project, produce 2–4 concise bullet lines by decomposing the provided descriptions into actions, tools, and measurable outcomes; stay faithful to supplied details.
+5. For every experience entry, produce 3–5 concise bullet lines emphasizing scope, contribution, and results using the given text; do not fabricate organizations or responsibilities.
+6. When content is short, meaningfully expand existing statements with truthful details (metrics, tech stack, context) derived from supplied text.
+7. Bullet items must remain single lines after typesetting; tighten wording if necessary while preserving action → impact flow.
+8. If space still remains, enrich existing bullets with quantifiable results or context from the input data so the page feels complete.
+9. Never add new sections or reorder existing ones.
 """
 
     # --- GROQ API Call ---
