@@ -75,8 +75,8 @@ class SourcePopularityAPIView(GenericAPIView):
 
     def get(self, request):
         source_stats = (
-            UserSource.objects
-            .filter(is_active=True)
+            UserSource.objects.select_related("source")
+            .filter(is_active=True,source__is_active=True)
             .values("source__name")
             .annotate(user_count=Count("user", distinct=True))
             .order_by("-user_count")
@@ -106,10 +106,26 @@ class DailyAIUsageAPIView(GenericAPIView):
             except ValueError:
                 return None
 
-        days = 5
-        start_datetime = timezone.now() - timedelta(days=days)
-        analytics_qs = AIAnalytics.objects.filter(is_active=True, created__gte=start_datetime).order_by("created")
+        dates_qs = (
+            AIAnalytics.objects.filter(is_active=True)
+            .annotate(date=TruncDate("created"))
+            .values("date")
+            .order_by("-date")
+            .distinct()
+        )[:5]
 
+        # Extract the date objects from the QuerySet
+        last_5_dates = [row["date"] for row in dates_qs]
+
+        # --- 2. Filter aggregation to only include the last 5 dates ---
+        if not last_5_dates:
+            return_data = {"dates": [], "series": [], "total_calls": 0, "totals_by_type": {}}
+            return get_response_schema(return_data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+        # Filter the main QuerySet by the last 5 dates
+        analytics_qs = AIAnalytics.objects.filter(is_active=True, created__date__in=last_5_dates)
+
+        # Aggregate data only for those 5 dates
         aggregated = list(
             analytics_qs
             .annotate(date=TruncDate("created"))
@@ -118,22 +134,20 @@ class DailyAIUsageAPIView(GenericAPIView):
             .order_by("date", "generation_type")
         )
 
-        if not aggregated:
-            return_data = {"dates": [], "series": [], "total_calls": 0, "totals_by_type": {}}
-            return get_response_schema(return_data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
-
-        date_list = sorted({row["date"] for row in aggregated})
+        date_list = sorted(last_5_dates)
         date_labels = [date.strftime("%Y-%m-%d") for date in date_list]
         date_index = {date: idx for idx, date in enumerate(date_list)}
 
         series_map = defaultdict(lambda: [0] * len(date_list))
         totals_by_type = defaultdict(int)
         for row in aggregated:
-            idx = date_index[row["date"]]
-            gen_type = row["generation_type"]
-            count = row["count"]
-            series_map[gen_type][idx] = count
-            totals_by_type[gen_type] += count
+            # Check if the row's date is in the final list, though it should be due to filtering
+            if row["date"] in date_index:
+                idx = date_index[row["date"]]
+                gen_type = row["generation_type"]
+                count = row["count"]
+                series_map[gen_type][idx] = count
+                totals_by_type[gen_type] += count
 
         totals_by_type = dict(totals_by_type)
         total_calls = sum(totals_by_type.values())
