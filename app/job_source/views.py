@@ -256,7 +256,7 @@ class UserSourceUpdateAPIView(GenericAPIView):
         return get_response_schema({}, SuccessMessage.RECORD_CREATED.value, status.HTTP_201_CREATED)
 
 
-class GetJobAlertsAPIView(GenericAPIView):
+class RecommendJobsAPIView(GenericAPIView):
     """Get Job Alerts"""
     permission_classes = [IsUser]
 
