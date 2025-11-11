@@ -93,7 +93,8 @@ class UserDisplaySerializer(serializers.ModelSerializer):
             'first_name',
             'last_name',
             'is_active',
-            'role'
+            'role',
+            'last_login'
         )
 
 

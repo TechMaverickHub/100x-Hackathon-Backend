@@ -1,7 +1,11 @@
+from collections import defaultdict
+from datetime import datetime, timedelta
+
 from django.contrib.auth import get_user_model
 from django.db.models import Count
 from django.db.models.functions import TruncDate
 from django.utils.timesince import timesince
+from django.utils import timezone
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
@@ -82,6 +86,68 @@ class SourcePopularityAPIView(GenericAPIView):
         counts = [item["user_count"] for item in source_stats]
 
         return_data = {"sources": sources, "counts": counts}
+
+        return get_response_schema(return_data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+
+class DailyAIUsageAPIView(GenericAPIView):
+    """
+    Returns daily AI call counts grouped by generation type for the super admin dashboard.
+    """
+
+    permission_classes = [IsSuperAdmin]
+
+    def get(self, request):
+        def parse_date(date_str):
+            if not date_str:
+                return None
+            try:
+                return datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                return None
+
+        days = 5
+        start_datetime = timezone.now() - timedelta(days=days)
+        analytics_qs = AIAnalytics.objects.filter(is_active=True, created__gte=start_datetime).order_by("created")
+
+        aggregated = list(
+            analytics_qs
+            .annotate(date=TruncDate("created"))
+            .values("date", "generation_type")
+            .annotate(count=Count("id"))
+            .order_by("date", "generation_type")
+        )
+
+        if not aggregated:
+            return_data = {"dates": [], "series": [], "total_calls": 0, "totals_by_type": {}}
+            return get_response_schema(return_data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
+
+        date_list = sorted({row["date"] for row in aggregated})
+        date_labels = [date.strftime("%Y-%m-%d") for date in date_list]
+        date_index = {date: idx for idx, date in enumerate(date_list)}
+
+        series_map = defaultdict(lambda: [0] * len(date_list))
+        totals_by_type = defaultdict(int)
+        for row in aggregated:
+            idx = date_index[row["date"]]
+            gen_type = row["generation_type"]
+            count = row["count"]
+            series_map[gen_type][idx] = count
+            totals_by_type[gen_type] += count
+
+        totals_by_type = dict(totals_by_type)
+        total_calls = sum(totals_by_type.values())
+        series = [
+            {"label": gen_type, "data": counts}
+            for gen_type, counts in series_map.items()
+        ]
+
+        return_data = {
+            "dates": date_labels,
+            "series": series,
+            "total_calls": total_calls,
+            "totals_by_type": totals_by_type,
+        }
 
         return get_response_schema(return_data, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 
