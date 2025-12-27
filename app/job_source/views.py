@@ -1,12 +1,13 @@
 from django.conf import settings
 from django.db import transaction
-from django.shortcuts import render
 from drf_yasg import openapi
 from drf_yasg.utils import swagger_auto_schema
 from rest_framework import status
 from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
+from app.analytics.analytics_utils import save_ai_analytics
+from app.analytics.models import AIAnalytics
 from app.core.views import CustomPageNumberPagination
 from app.global_constants import ErrorMessage, SuccessMessage
 from app.job_source.job_source_utils import get_job_alerts_for_user
@@ -255,7 +256,7 @@ class UserSourceUpdateAPIView(GenericAPIView):
         return get_response_schema({}, SuccessMessage.RECORD_CREATED.value, status.HTTP_201_CREATED)
 
 
-class GetJobAlertsAPIView(GenericAPIView):
+class RecommendJobsAPIView(GenericAPIView):
     """Get Job Alerts"""
     permission_classes = [IsUser]
 
@@ -280,5 +281,8 @@ class GetJobAlertsAPIView(GenericAPIView):
         resume_text = extract_resume_text(file_path, file_type)
 
         job_alerts = get_job_alerts_for_user(resume_text, request.user)
+
+        save_ai_analytics(request.user, AIAnalytics.GenerationType.JOB_RECOMMENDATION, job_alerts)
+        
         return get_response_schema(job_alerts, SuccessMessage.RECORD_RETRIEVED.value, status.HTTP_200_OK)
 

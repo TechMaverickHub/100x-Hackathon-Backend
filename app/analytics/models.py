@@ -23,6 +23,8 @@ class AIAnalytics(models.Model):
         RESUME_SKILLS_GAP = "Resume Skills Gap", _("Resume Skills Gap")
         RESUME_CAREER_RECOMMENDATION = "Resume Career Recommendation", _("Resume Career Recommendation")
 
+        JOB_RECOMMENDATION = "Job Recommendation", _("Job Recommendation")
+
     # Foreign key
     user = models.ForeignKey(
         get_user_model(),
